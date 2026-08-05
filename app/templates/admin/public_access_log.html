@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Acessos ao portal público{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.audit_list'), "Voltar para a auditoria") }}
+<div class="page-header">
+  <h1>Acessos ao portal público (sem login)</h1>
+  <p class="muted">Toda busca por nome e todo download feito na página pública "Como usar no Outlook" fica registrado aqui, com o IP de origem.</p>
+</div>
+
+{% if pagination.items %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Data</th><th>Ação</th><th>Nome buscado</th><th>Resultados</th><th>IP</th></tr></thead>
+    <tbody>
+      {% for log in pagination.items %}
+      <tr>
+        <td>{{ log.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>
+          {% if log.action == 'download' %}
+            <span class="badge badge--active">Download</span>
+          {% else %}
+            <span class="badge">Busca</span>
+          {% endif %}
+        </td>
+        <td>{{ log.searched_name or '—' }}</td>
+        <td>{{ log.matches_found if log.matches_found is not none else '—' }}</td>
+        <td>{{ log.ip_address or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}<a href="{{ url_for('admin.public_access_log', page=pagination.prev_num) }}" class="btn btn--small btn--ghost">Anterior</a>{% endif %}
+  <span class="muted">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+  {% if pagination.has_next %}<a href="{{ url_for('admin.public_access_log', page=pagination.next_num) }}" class="btn btn--small btn--ghost">Próxima</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <h2>Nenhum acesso registrado ainda</h2>
+  <p class="muted">Assim que alguém buscar ou baixar uma assinatura pelo portal público, os registros aparecem aqui.</p>
+</div>
+{% endif %}
+{% endblock %}

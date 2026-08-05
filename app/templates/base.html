@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Assinaturas de E-mail{% endblock %} · Sistema de Assinaturas de E-mail</title>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{# Síncrono de propósito (sem defer/async): precisa rodar ANTES do <body>
+   pintar, para não haver flash de tema claro em quem já escolheu escuro.
+   Arquivo externo porque a CSP (script-src 'self') bloqueia <script> inline. #}
+<script src="{{ url_for('static', filename='js/theme-init.js') }}"></script>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+{% import "_icons.html" as icons %}
+{% macro theme_toggle_btn(cls) %}
+<button type="button" class="theme-toggle {{ cls }}" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
+  <span class="theme-toggle__icon theme-toggle__icon--sun">{{ icons.sun() }}</span>
+  <span class="theme-toggle__icon theme-toggle__icon--moon">{{ icons.moon() }}</span>
+</button>
+{% endmacro %}
+
+{# O bloco de conteúdo ({% block content %}) só pode aparecer UMA vez no
+   template (limitação do Jinja) — por isso a diferença entre "com sidebar"
+   (usuário autenticado) e "sem sidebar" (páginas públicas: login, portal
+   público) é feita abrindo/fechando as divs do layout em blocos if/else
+   separados ANTES e DEPOIS do bloco de conteúdo, que fica só no meio,
+   compartilhado pelos dois casos. #}
+{% if current_user.is_authenticated %}
+<div class="app-shell">
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <aside class="sidebar" id="mainNav">
+    <a class="sidebar__brand" href="{{ url_for('main.index') }}">
+      {{ icons.envelope("brand__icon") }}
+      <span>Sistema de Assinaturas de E-mail</span>
+    </a>
+
+    <nav class="sidebar__nav">
+      {% if current_user.is_admin %}
+        <a href="{{ url_for('admin.dashboard') }}" class="nav__link {{ 'is-active' if request.endpoint == 'admin.dashboard' }}">{{ icons.dashboard() }}<span>Painel</span></a>
+        <a href="{{ url_for('user.new_signature') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.new_signature' }}">{{ icons.envelope() }}<span>Gerar assinatura</span></a>
+        <a href="{{ url_for('admin.batch_import') }}" class="nav__link {{ 'is-active' if request.endpoint and request.endpoint.startswith('admin.batch_import') }}">{{ icons.history() }}<span>Importar planilha</span></a>
+        <a href="{{ url_for('admin.templates_list') }}" class="nav__link {{ 'is-active' if request.endpoint and request.endpoint.startswith('admin.template') }}">{{ icons.image() }}<span>Modelos</span></a>
+        <a href="{{ url_for('admin.users_list') }}" class="nav__link {{ 'is-active' if request.endpoint and request.endpoint.startswith('admin.user') }}">{{ icons.users() }}<span>Usuários</span></a>
+        <a href="{{ url_for('admin.audit_list') }}" class="nav__link {{ 'is-active' if (request.endpoint and request.endpoint.startswith('admin.audit')) or request.endpoint == 'admin.public_access_log' }}">{{ icons.shield() }}<span>Auditoria</span></a>
+      {% elif current_user.is_supervisor %}
+        <a href="{{ url_for('user.new_signature') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.new_signature' }}">{{ icons.envelope() }}<span>Gerar assinatura</span></a>
+        <a href="{{ url_for('admin.batch_import') }}" class="nav__link {{ 'is-active' if request.endpoint and request.endpoint.startswith('admin.batch_import') }}">{{ icons.history() }}<span>Importar planilha</span></a>
+      {% else %}
+        <a href="{{ url_for('user.dashboard') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.dashboard' }}">{{ icons.dashboard() }}<span>Início</span></a>
+        <a href="{{ url_for('user.new_signature') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.new_signature' }}">{{ icons.envelope() }}<span>Nova assinatura</span></a>
+        <a href="{{ url_for('user.history') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.history' }}">{{ icons.history() }}<span>Histórico</span></a>
+      {% endif %}
+      <a href="{{ url_for('main.outlook_help') }}" class="nav__link {{ 'is-active' if request.endpoint == 'main.outlook_help' }}">{{ icons.qrcode() }}<span>Como usar no Outlook</span></a>
+      <a href="{{ url_for('auth.change_password') }}" class="nav__link {{ 'is-active' if request.endpoint == 'auth.change_password' }}">{{ icons.user() }}<span>Minha conta</span></a>
+    </nav>
+
+    <div class="sidebar__footer">
+      <a href="{{ url_for('auth.logout') }}" class="nav__link nav__link--logout">{{ icons.logout() }}<span>Sair</span></a>
+      {{ theme_toggle_btn("theme-toggle--inline") }}
+    </div>
+  </aside>
+
+  <div class="app-main">
+    <header class="topbar">
+      <div class="topbar__inner">
+        <button class="nav-toggle" id="navToggle" aria-label="Abrir menu" aria-expanded="false">
+          {{ icons.menu() }}
+        </button>
+        <span class="topbar__title">Sistema de Assinaturas de E-mail</span>
+      </div>
+    </header>
+{% else %}
+  {{ theme_toggle_btn("theme-toggle--floating") }}
+{% endif %}
+
+    <main class="page">
+      <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="flash-stack">
+              {% for category, message in messages %}
+                <div class="flash flash--{{ category }}" role="alert">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container footer__inner">
+        <span>Sistema de Assinaturas de E-mail · v{{ app_version }}</span>
+        <span>&copy; {{ current_year }}</span>
+      </div>
+    </footer>
+
+{% if current_user.is_authenticated %}
+  </div>
+</div>
+{% endif %}
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

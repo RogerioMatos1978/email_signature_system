@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% block title %}Como usar no Outlook{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Como inserir sua assinatura no Outlook</h1>
+  <p class="muted">Depois de gerar sua imagem (PNG ou JPG), baixe o arquivo e siga o passo a passo abaixo, conforme a versão do Outlook que você usa.</p>
+</div>
+
+<div class="card card--tip">
+  <h2>Buscar minha assinatura (sem precisar de login)</h2>
+  <p class="muted">Já geraram sua assinatura (individualmente ou em uma importação de planilha)? Digite seu nome completo abaixo para localizá-la e baixar — sem precisar de usuário ou senha.</p>
+  <form method="get" class="public-search__form">
+    <input type="text" name="nome" value="{{ query_name }}" placeholder="Digite seu nome completo" minlength="{{ min_chars }}" maxlength="120" class="field__input" autocomplete="off">
+    <button type="submit" class="btn btn--primary">{{ icons.search("icon") }}<span>Buscar</span></button>
+  </form>
+
+  {% if searched %}
+    {% if matches|length == 0 %}
+      <p class="muted mt-1">Nenhuma assinatura encontrada para "{{ query_name }}". Confira a digitação do nome ou peça ao Supervisor/Administrador para verificar se ela já foi gerada.</p>
+    {% else %}
+      <ul class="public-search__results mt-1">
+        {% for record in matches %}
+        <li class="public-search__result">
+          <div>
+            <strong>{{ record.full_name }}</strong>
+            <span class="muted">— {{ record.role_title }}{% if record.unit %} · {{ record.unit }}{% endif %}</span>
+          </div>
+          {% if record.public_downloaded_at %}
+            <span class="badge badge--muted">Já baixada em {{ record.public_downloaded_at.strftime('%d/%m/%Y') }} — solicite ao Supervisor/Administrador</span>
+          {% else %}
+            <form method="post" action="{{ url_for('main.public_download', record_id=record.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn--secondary btn--small">{{ icons.download("icon") }}<span>Baixar assinatura</span></button>
+            </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="field__help mt-05">Depois de baixada, a assinatura não fica mais disponível aqui — guarde bem o arquivo. Se precisar de novo, peça ao Supervisor ou Administrador para reenviar por WhatsApp.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Outlook novo (New Outlook para Windows)</h2>
+  <ol class="steps">
+    <li>Abra o Outlook e clique no ícone de <strong>Configurações</strong> (engrenagem).</li>
+    <li>Vá em <strong>Contas &gt; Assinaturas</strong>.</li>
+    <li>Se houver mais de uma conta, selecione a conta para a qual deseja aplicar a assinatura.</li>
+    <li>Clique em <strong>Adicionar assinatura</strong> e dê um nome a ela.</li>
+    <li>Clique dentro da caixa de edição, no local onde a imagem deve aparecer, e use o botão de <strong>inserir imagem</strong> da barra de ferramentas para selecionar o arquivo da sua assinatura.</li>
+    <li>Marque as caixas para aplicar a assinatura em novas mensagens e/ou respostas, se desejar.</li>
+    <li>Clique em <strong>Salvar</strong>.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>Outlook clássico (Outlook para Windows – versão desktop tradicional)</h2>
+  <ol class="steps">
+    <li>Abra uma nova mensagem de e-mail.</li>
+    <li>Na guia <strong>Mensagem</strong>, clique em <strong>Assinatura &gt; Assinaturas...</strong></li>
+    <li>Em "Selecionar assinatura para editar", clique em <strong>Novo</strong> (ou selecione uma existente).</li>
+    <li>Na caixa de edição, posicione o cursor onde a imagem deve aparecer e clique no ícone de <strong>Imagem</strong>.</li>
+    <li>Selecione o arquivo PNG/JPG gerado pelo sistema e clique em <strong>Inserir</strong>.</li>
+    <li>Se necessário, clique com o botão direito na imagem, escolha <strong>Imagem</strong>, ajuste o tamanho na aba <strong>Tamanho</strong> mantendo <strong>Bloquear proporções</strong> marcado.</li>
+    <li>Clique em <strong>OK</strong> e depois em <strong>OK</strong> novamente para salvar a assinatura.</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>Outlook na Web (Outlook.com / Office 365)</h2>
+  <ol class="steps">
+    <li>Acesse <strong>Configurações &gt; Contas &gt; Assinaturas</strong>.</li>
+    <li>Clique dentro da caixa de assinatura, no local desejado.</li>
+    <li>Use a opção de inserir imagem para adicionar o arquivo gerado.</li>
+    <li>Salve as alterações.</li>
+  </ol>
+</div>
+
+<div class="card card--tip">
+  <h2>Dicas importantes</h2>
+  <ul class="steps">
+    <li>Os formatos aceitos pelo Outlook são <strong>JPG, PNG e GIF</strong> — os formatos gerados por este sistema (PNG e JPG) são totalmente compatíveis.</li>
+    <li>Prefira o formato <strong>PNG</strong> quando possível: mantém o texto nítido, sem os artefatos de compressão do JPG.</li>
+    <li>Este sistema já gera a imagem em uma resolução adequada para assinaturas (nítida em telas comuns e retina, sem deixar o arquivo pesado).</li>
+    <li>Depois de inserir a imagem, evite redimensioná-la manualmente de forma desproporcional — isso pode distorcer o texto.</li>
+  </ul>
+</div>
+
+<p class="muted footnote">
+  Fonte: documentação oficial da Microsoft —
+  <a href="https://support.microsoft.com/en-us/outlook/mail/how-to-add-and-change-an-email-signature-in-outlook" target="_blank" rel="noopener noreferrer">How to add and change an email signature in Outlook</a>.
+</p>
+{% endblock %}

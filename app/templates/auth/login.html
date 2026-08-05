@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% block title %}Entrar{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <div class="auth-card__brand">
+      {% import "_icons.html" as icons %}
+      {{ icons.envelope("auth-card__icon") }}
+      <h1>Assinaturas de E-mail</h1>
+      <p class="muted">Entre com sua conta para continuar</p>
+    </div>
+
+    <form method="post" novalidate>
+      {{ form.hidden_tag() }}
+      {{ fh.field(form.username, autocomplete="username") }}
+      {{ fh.field(form.password, autocomplete="current-password") }}
+      <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+    </form>
+
+    <p class="muted auth-card__footnote">
+      Não tem uma conta? Se sua assinatura já foi gerada por um Supervisor ou Administrador, você pode
+      <a href="{{ url_for('main.outlook_help') }}">buscá-la pelo nome e baixar sem fazer login</a>.
+    </p>
+  </div>
+</div>
+{% endblock %}

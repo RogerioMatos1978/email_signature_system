@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Modelos de assinatura{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard')) }}
+<div class="page-header page-header--row">
+  <div>
+    <h1>Modelos de assinatura</h1>
+    <p class="muted">A imagem de fundo padrão que os usuários usarão para gerar suas assinaturas.</p>
+  </div>
+  <a href="{{ url_for('admin.template_new') }}" class="btn btn--primary">Novo modelo</a>
+</div>
+
+{% if templates %}
+<div class="grid grid--3">
+  {% for t in templates %}
+  <div class="card template-card">
+    <img src="{{ url_for('main.template_background', template_id=t.id) }}" alt="{{ t.name }}" class="template-card__img">
+    <h2>{{ t.name }} {% if t.is_active %}<span class="badge badge--active">Ativo</span>{% endif %}</h2>
+    <p class="muted"><span class="badge">{{ "Com foto" if t.variant == "com_foto" else "Sem foto" }}</span> · {{ t.width }}×{{ t.height }}px · atualizado em {{ t.updated_at.strftime('%d/%m/%Y') }}</p>
+    <div class="btn-row">
+      <a href="{{ url_for('admin.template_edit', template_id=t.id) }}" class="btn btn--small btn--secondary">Editar</a>
+      <form method="post" action="{{ url_for('admin.template_restore_default', template_id=t.id) }}" onsubmit="return confirm('Reaplicar o layout padrão (posições, cores e tamanhos de fonte) a este modelo?');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn--small btn--ghost">Restaurar layout padrão</button>
+      </form>
+      {% if not t.is_active %}
+      <form method="post" action="{{ url_for('admin.template_activate', template_id=t.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn--small btn--primary">Ativar</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ url_for('admin.template_delete', template_id=t.id) }}" onsubmit="return confirm('Excluir este modelo? Esta ação não pode ser desfeita.');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn--small btn--danger">Excluir</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <h2>Nenhum modelo cadastrado</h2>
+  <p class="muted">Crie o primeiro modelo para liberar a geração de assinaturas aos usuários.</p>
+  <a href="{{ url_for('admin.template_new') }}" class="btn btn--primary">Criar modelo</a>
+</div>
+{% endif %}
+{% endblock %}

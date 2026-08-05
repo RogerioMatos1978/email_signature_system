@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% block title %}Início{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Olá, {{ current_user.name.split(' ')[0] }} 👋</h1>
+  <p class="muted">Gere e gerencie sua assinatura de e-mail para o Outlook.</p>
+</div>
+
+<div class="grid grid--2">
+  {% if current_user.is_admin or current_user.can_generate_signature %}
+  <a class="card card--action" href="{{ url_for('user.new_signature') }}">
+    {{ icons.envelope("card-action__icon") }}
+    <h2>Nova assinatura</h2>
+    <p class="muted">Preencha seus dados e gere sua assinatura em PNG ou JPG.</p>
+  </a>
+  {% else %}
+  <div class="card card--action card--disabled">
+    {{ icons.envelope("card-action__icon") }}
+    <h2>Nova assinatura</h2>
+    <p class="muted">Você já gerou e baixou sua assinatura. Para gerar uma nova, solicite a liberação ao administrador.</p>
+  </div>
+  {% endif %}
+  <a class="card card--action" href="{{ url_for('user.history') }}">
+    {{ icons.history("card-action__icon") }}
+    <h2>Meu histórico</h2>
+    <p class="muted">Veja e baixe assinaturas geradas anteriormente.</p>
+  </a>
+</div>
+
+{% if not active_template %}
+<div class="flash flash--info mt-1-5">
+  Nenhum modelo de assinatura foi configurado pelo administrador ainda. Assim que estiver disponível, você poderá gerar sua assinatura aqui.
+</div>
+{% endif %}
+
+{% if last_signature %}
+<div class="card mt-1-5">
+  <h2>Última assinatura gerada</h2>
+  <p class="muted">{{ last_signature.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+  <a class="btn btn--secondary" href="{{ url_for('user.result', record_id=last_signature.id) }}">Ver detalhes</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Nova assinatura{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard') if current_user.is_admin else (url_for('admin.batch_import') if current_user.is_supervisor else url_for('user.dashboard'))) }}
+<div class="page-header">
+  <h1>{{ 'Gerar assinatura individual' if (current_user.is_admin or current_user.is_supervisor) else 'Nova assinatura' }}</h1>
+  <p class="muted">
+    {% if current_user.is_admin or current_user.is_supervisor %}
+      Preencha os dados do colaborador abaixo — com ou sem foto. A pré-visualização é atualizada em tempo real. Para gerar várias de uma vez, use <a href="{{ url_for('admin.batch_import') }}">Importar planilha</a>.
+    {% else %}
+      Preencha seus dados abaixo. A pré-visualização é atualizada em tempo real.
+    {% endif %}
+  </p>
+</div>
+
+{% if not has_any_template %}
+<div class="empty-state">
+  <h2>Nenhum modelo definido</h2>
+  <p class="muted">O administrador ainda não configurou os modelos de assinatura. Tente novamente mais tarde.</p>
+</div>
+{% else %}
+<div class="signature-layout">
+  <div class="card">
+    <form method="post" enctype="multipart/form-data" novalidate id="signatureForm">
+      {{ form.hidden_tag() }}
+      {{ fh.field(form.full_name) }}
+      {{ fh.field(form.role_title) }}
+      {{ fh.field(form.unit, "Ex.: SESI Campinas, Gerência de TI") }}
+      {{ fh.field(form.signature_email) }}
+      {{ fh.field(form.phone, "Ex.: (62) 91234-5678") }}
+
+      {% if templates.com_foto %}
+      <div class="field">
+        <label class="editor-panel__checkbox field__label">
+          {{ form.with_photo(id="with_photo") }} {{ form.with_photo.label.text }}
+        </label>
+        <p class="field__help">Nem todos os colaboradores usam foto — marque apenas se a sua assinatura for com foto.</p>
+      </div>
+      <div id="photoField" class="is-hidden">
+        {{ fh.file_field(form.photo, "PNG ou JPG, até 5MB. A foto é recortada automaticamente para caber na moldura.") }}
+      </div>
+      {% endif %}
+
+      {{ fh.field(form.output_format) }}
+      <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+    </form>
+  </div>
+
+  <div class="card preview-card">
+    <h2>Pré-visualização</h2>
+    <p class="muted">Assim ficará sua assinatura (aproximado).</p>
+    <div class="preview-frame">
+      <canvas id="signaturePreview"></canvas>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="templateConfig">
+{{ {
+  "variants": {
+    "sem_foto": ({
+      "backgroundUrl": url_for('main.template_background', template_id=templates.sem_foto.id),
+      "width": templates.sem_foto.width,
+      "height": templates.sem_foto.height,
+      "fields": templates.sem_foto.get_fields()
+    } if templates.sem_foto else none),
+    "com_foto": ({
+      "backgroundUrl": url_for('main.template_background', template_id=templates.com_foto.id),
+      "width": templates.com_foto.width,
+      "height": templates.com_foto.height,
+      "fields": templates.com_foto.get_fields()
+    } if templates.com_foto else none)
+  }
+} | tojson }}
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if has_any_template %}
+<script src="{{ url_for('static', filename='js/preview.js') }}"></script>
+{% endif %}
+{% endblock %}

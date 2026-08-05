@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% block title %}Painel do administrador{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Painel do administrador</h1>
+  <p class="muted">Visão geral do sistema de assinaturas.</p>
+</div>
+
+<div class="grid grid--4">
+  <div class="card stat-card">
+    {{ icons.users("stat-card__icon") }}
+    <span class="stat-card__value">{{ users_count }}</span>
+    <span class="stat-card__label">Usuários padrão</span>
+  </div>
+  <div class="card stat-card">
+    {{ icons.shield("stat-card__icon") }}
+    <span class="stat-card__value">{{ admins_count }}</span>
+    <span class="stat-card__label">Administradores</span>
+  </div>
+  <div class="card stat-card">
+    {{ icons.users("stat-card__icon") }}
+    <span class="stat-card__value">{{ supervisors_count }}</span>
+    <span class="stat-card__label">Supervisores</span>
+  </div>
+  <div class="card stat-card">
+    {{ icons.envelope("stat-card__icon") }}
+    <span class="stat-card__value">{{ total_signatures }}</span>
+    <span class="stat-card__label">Assinaturas geradas</span>
+  </div>
+  <div class="card stat-card">
+    {{ icons.image("stat-card__icon") }}
+    <span class="stat-card__value">{{ "Ativo" if active_template else "Nenhum" }}</span>
+    <span class="stat-card__label">Modelo padrão</span>
+  </div>
+</div>
+
+<div class="grid grid--2 mt-1-5">
+  <a class="card card--action" href="{{ url_for('admin.templates_list') }}">
+    {{ icons.image("card-action__icon") }}
+    <h2>Modelos de assinatura</h2>
+    <p class="muted">Defina a imagem de fundo padrão e o posicionamento dos campos.</p>
+  </a>
+  <a class="card card--action" href="{{ url_for('admin.users_list') }}">
+    {{ icons.users("card-action__icon") }}
+    <h2>Usuários</h2>
+    <p class="muted">Crie, edite e gerencie contas de acesso ao sistema.</p>
+  </a>
+  <a class="card card--action" href="{{ url_for('admin.batch_import') }}">
+    {{ icons.history("card-action__icon") }}
+    <h2>Importar planilha</h2>
+    <p class="muted">Gere assinaturas em lote a partir de uma planilha de colaboradores.</p>
+  </a>
+</div>
+
+<div class="card mt-1-5">
+  <h2>Últimas assinaturas geradas</h2>
+  {% if recent_records %}
+  <div class="table-wrap">
+    <table class="table">
+      <thead><tr><th>Data</th><th>Usuário</th><th>Nome na assinatura</th><th>Formato</th></tr></thead>
+      <tbody>
+        {% for r in recent_records %}
+        <tr>
+          <td>{{ r.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td>{{ r.user.name if r.user else '—' }}</td>
+          <td>{{ r.full_name }}</td>
+          <td>{{ r.output_format | upper }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <a href="{{ url_for('admin.audit_list') }}" class="btn btn--secondary mt-1">Ver auditoria completa</a>
+  {% else %}
+  <p class="muted">Nenhuma assinatura gerada até o momento.</p>
+  {% endif %}
+</div>
+{% endblock %}

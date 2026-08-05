@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Confirmar assinatura{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('user.new_signature'), "Voltar e editar") }}
+<div class="page-header">
+  <h1>Confirme seus dados</h1>
+  <p class="muted">Revise as informações abaixo antes de gerar sua assinatura definitiva.</p>
+</div>
+
+<div class="signature-layout">
+  <div class="card">
+    <h2>Dados informados</h2>
+    <dl class="summary-list">
+      <dt>Nome completo</dt><dd>{{ record.full_name }}</dd>
+      <dt>Função</dt><dd>{{ record.role_title }}</dd>
+      <dt>Unidade / Gerência</dt><dd>{{ record.unit }}</dd>
+      <dt>E-mail</dt><dd>{{ record.signature_email }}</dd>
+      <dt>Telefone</dt><dd>{{ record.phone }}</dd>
+      <dt>Foto</dt><dd>{{ "Com foto" if record.photo_filename else "Sem foto" }}</dd>
+      <dt>Formato de saída</dt><dd>{{ record.output_format | upper }}</dd>
+    </dl>
+
+    <div class="btn-row">
+      <form method="post" action="{{ url_for('user.confirm_signature') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="confirmar">
+        <button type="submit" class="btn btn--primary">Está tudo correto, gerar assinatura</button>
+      </form>
+      <form method="post" action="{{ url_for('user.confirm_signature') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="cancelar">
+        <button type="submit" class="btn btn--ghost">Cancelar e editar</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card preview-card">
+    <h2>Pré-visualização</h2>
+    <img class="preview-image" src="{{ url_for('user.preview_file', record_id=record.id) }}" alt="Pré-visualização da assinatura">
+  </div>
+</div>
+{% endblock %}

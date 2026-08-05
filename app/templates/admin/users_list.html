@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Usuários{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard')) }}
+<div class="page-header page-header--row">
+  <div>
+    <h1>Usuários</h1>
+    <p class="muted">Gerencie as contas de acesso ao sistema.</p>
+  </div>
+  <a href="{{ url_for('admin.user_new') }}" class="btn btn--primary">Novo usuário</a>
+</div>
+
+{% if pagination.items %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Nome</th><th>Usuário</th><th>Perfil</th><th>Situação</th><th>Assinatura</th><th></th></tr></thead>
+    <tbody>
+      {% for u in pagination.items %}
+      <tr>
+        <td>{{ u.name }}</td>
+        <td>{{ u.username }}</td>
+        <td><span class="badge {{ 'badge--active' if u.is_admin else '' }}">{{ 'Administrador' if u.is_admin else ('Supervisor' if u.is_supervisor else 'Usuário padrão') }}</span></td>
+        <td>{% if u.is_active_flag %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--muted">Inativo</span>{% endif %}</td>
+        <td>
+          {% if u.is_admin or u.is_supervisor %}<span class="badge">—</span>
+          {% elif u.can_generate_signature %}<span class="badge badge--active">Liberada</span>
+          {% else %}<span class="badge badge--muted">Bloqueada</span>{% endif %}
+        </td>
+        <td class="table__actions">
+          {% if not u.is_admin and not u.is_supervisor and not u.can_generate_signature %}
+          <form method="post" action="{{ url_for('admin.user_allow_signature', user_id=u.id, page=pagination.page) }}" onsubmit="return confirm('Liberar este usuário para gerar uma nova assinatura?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn--small btn--primary">Liberar assinatura</button>
+          </form>
+          {% endif %}
+          <a href="{{ url_for('admin.user_edit', user_id=u.id) }}" class="btn btn--small btn--secondary">Editar</a>
+          <form method="post" action="{{ url_for('admin.user_reset_password', user_id=u.id) }}" onsubmit="return confirm('Gerar nova senha temporária para este usuário?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn--small btn--ghost">Resetar senha</button>
+          </form>
+          {% if u.id != current_user.id %}
+          <form method="post" action="{{ url_for('admin.user_delete', user_id=u.id) }}" onsubmit="return confirm('Excluir este usuário? Esta ação não pode ser desfeita.');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn--small btn--danger">Excluir</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}<a href="{{ url_for('admin.users_list', page=pagination.prev_num) }}" class="btn btn--small btn--ghost">Anterior</a>{% endif %}
+  <span class="muted">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+  {% if pagination.has_next %}<a href="{{ url_for('admin.users_list', page=pagination.next_num) }}" class="btn btn--small btn--ghost">Próxima</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <h2>Nenhum usuário cadastrado</h2>
+  <a href="{{ url_for('admin.user_new') }}" class="btn btn--primary">Criar usuário</a>
+</div>
+{% endif %}
+{% endblock %}

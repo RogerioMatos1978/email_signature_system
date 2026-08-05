@@ -1,0 +1,8 @@
+{% import "_icons.html" as icons %}
+{# Link "Voltar" reutilizável — usado no topo das páginas internas (fora dos
+   painéis principais de cada papel) para não depender só do botão "voltar"
+   do navegador. Uso: {{ back_btn.back(url_for('...')) }} logo antes de
+   .page-header. #}
+{% macro back(url, label="Voltar") %}
+<a href="{{ url }}" class="back-link">{{ icons.arrow_left("icon") }}<span>{{ label }}</span></a>
+{% endmacro %}

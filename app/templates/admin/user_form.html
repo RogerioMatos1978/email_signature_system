@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}{{ 'Editar usuário' if user else 'Novo usuário' }}{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.users_list')) }}
+<div class="page-header">
+  <h1>{{ 'Editar usuário' if user else 'Novo usuário' }}</h1>
+</div>
+
+{% if temp_password %}
+<div class="card card--tip">
+  <h2>Usuário criado com sucesso</h2>
+  <p>Senha temporária (copie agora — não será exibida novamente):</p>
+  <p class="temp-password">{{ temp_password }}</p>
+  <p class="muted">O usuário precisará trocar a senha no primeiro acesso.</p>
+  <a href="{{ url_for('admin.users_list') }}" class="btn btn--primary">Voltar para a lista</a>
+</div>
+{% else %}
+<div class="card card--narrow">
+  <form method="post" novalidate>
+    {{ form.hidden_tag() }}
+    {{ fh.field(form.name) }}
+    {% if not user %}{{ fh.field(form.username) }}{% else %}
+      <div class="field"><label class="field__label">Usuário</label><p class="field__input field__input--readonly">{{ user.username }}</p></div>
+    {% endif %}
+    {{ fh.field(form.role) }}
+    {% if user %}{{ fh.field(form.is_active) }}{% endif %}
+    <button type="submit" class="btn btn--primary">{{ 'Salvar alterações' if user else 'Criar usuário' }}</button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

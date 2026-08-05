@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    image: email-signature-system:v1
+    container_name: email_signature_system
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      # A porta vem do .env (PORT), com 5002 como padrão — um único lugar para
+      # mudar a porta do sistema inteiro (mapeamento, Gunicorn e healthcheck).
+      - "${PORT:-5002}:${PORT:-5002}"
+    volumes:
+      # Persiste banco de dados e arquivos enviados/gerados fora do container
+      - signature_instance:/app/instance
+    healthcheck:
+      # $$ (escapado) é resolvido DENTRO do container, usando o PORT do .env.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:$${PORT:-5002}/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  signature_instance:

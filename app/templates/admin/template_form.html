@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}{{ 'Editar modelo' if template else 'Novo modelo' }}{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.templates_list')) }}
+<div class="page-header">
+  <h1>{{ 'Editar modelo' if template else 'Novo modelo' }}</h1>
+  <p class="muted">Envie a imagem de fundo padrão e arraste os marcadores para posicionar cada campo. Os usuários só preencherão o texto — o layout é definido aqui.</p>
+</div>
+
+<form method="post" enctype="multipart/form-data" novalidate id="templateForm">
+  {# Só o CSRF token aqui — fields_json é renderizado manualmente mais abaixo
+     (com id fixo controlado pelo JS). Renderizar via hidden_tag() TAMBÉM
+     criaria um segundo <input name="fields_json"> desatualizado, e o
+     navegador submeteria o valor do PRIMEIRO campo com esse nome — descartando
+     silenciosamente a posição arrastada pelo usuário. #}
+  {{ form.hidden_tag(form.csrf_token) }}
+
+  <div class="card card--narrow">
+    {{ fh.field(form.name) }}
+    {{ fh.field(form.variant) }}
+    {{ fh.file_field(form.background_image, "PNG ou JPG, até 5MB. " + ("Envie apenas se quiser substituir a imagem atual." if template else "Recomendado: aprox. 2600×866px (proporção do padrão FIEG 2026) para boa nitidez no Outlook.")) }}
+  </div>
+
+  <div class="card card--narrow">
+    <details>
+      <summary class="field__label cursor-pointer">Avançado: colar configuração de posições (JSON)</summary>
+      <p class="field__help">Cole aqui uma configuração de posições já calculada (ex.: gerada a partir de um layout pronto) e clique em "Aplicar JSON" para posicionar os campos automaticamente, sem precisar arrastar.</p>
+      <textarea id="fieldsJsonImport" class="field__input" rows="4" placeholder='{"full_name": {"x_pct": 0.19, "y_pct": 0.16, ...}, ...}'></textarea>
+      <button type="button" id="applyFieldsJsonBtn" class="btn btn--secondary mt-05">Aplicar JSON</button>
+      <p id="fieldsJsonImportError" class="field__error is-hidden"></p>
+    </details>
+  </div>
+
+  <div class="card editor-card">
+    <div class="editor-stage" id="editorStage">
+      <img id="editorBgImg" class="editor-stage__bg {{ '' if template else 'is-hidden' }}"
+           src="{{ url_for('main.template_background', template_id=template.id) if template else '' }}"
+           alt="Fundo do modelo">
+      <p id="editorNoImage" class="muted {{ 'is-hidden' if template else '' }}">Selecione uma imagem de fundo para começar a posicionar os campos.</p>
+      <div class="editor-grid" aria-hidden="true"></div>
+      <div class="editor-marker is-hidden" data-field="full_name"><span>Nome</span></div>
+      <div class="editor-marker is-hidden" data-field="role_title"><span>Função</span></div>
+      <div class="editor-marker is-hidden" data-field="unit"><span>Unidade</span></div>
+      <div class="editor-marker is-hidden" data-field="signature_email"><span>E-mail</span></div>
+      <div class="editor-marker is-hidden" data-field="phone"><span>Telefone</span></div>
+      <div class="editor-marker editor-marker--qr is-hidden" data-field="photo"><span>Foto</span></div>
+    </div>
+
+    <div class="editor-panels" id="editorPanels">
+      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone")] %}
+      <fieldset class="editor-panel" data-field-panel="{{ key }}">
+        <legend>{{ label }}</legend>
+        <label>Tamanho da fonte <input type="number" min="8" max="72" step="0.1" data-prop="font_size" value="18"></label>
+        <label>Cor <input type="color" data-prop="color" value="#FFFFFF"></label>
+        <label>Alinhamento
+          <select data-prop="align">
+            <option value="left">Esquerda</option>
+            <option value="center">Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </label>
+        <label class="editor-panel__checkbox"><input type="checkbox" data-prop="bold"> Negrito</label>
+        <label>Largura máx. do texto (%) <input type="range" min="10" max="100" data-prop="box_width_pct_pct" value="60"></label>
+        <label>Máx. de caracteres <input type="number" min="5" max="120" data-prop="max_chars" value="60"></label>
+      </fieldset>
+      {% endfor %}
+      <fieldset class="editor-panel" data-field-panel="photo">
+        <legend>Foto do colaborador (variante com foto)</legend>
+        <label>Largura (%) <input type="range" min="3" max="60" data-prop="width_pct_pct" value="16"></label>
+        <label>Altura (%) <input type="range" min="3" max="100" data-prop="height_pct_pct" value="51"></label>
+        <label>Cor da moldura <input type="color" data-prop="border_color" value="#008BD2"></label>
+        <label>Espessura da moldura (px) <input type="number" min="0" max="20" data-prop="border_px" value="0"></label>
+      </fieldset>
+    </div>
+  </div>
+
+  {{ form.fields_json(id="fieldsJsonInput") }}
+  <button type="submit" class="btn btn--primary">{{ form.submit.label.text }}</button>
+</form>
+
+<script type="application/json" id="initialFields">{{ (template.get_fields() if template else {}) | tojson }}</script>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/template_editor.js') }}"></script>
+{% endblock %}

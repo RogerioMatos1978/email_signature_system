@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_icons.html" as icons %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Assinatura gerada{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard') if current_user.is_admin else (url_for('admin.batch_import') if current_user.is_supervisor else url_for('user.dashboard'))) }}
+<div class="page-header">
+  <h1>{{ icons.check("inline-icon") }} Assinatura gerada com sucesso</h1>
+  <p class="muted">Sua assinatura foi registrada na página de auditoria em {{ record.created_at.strftime('%d/%m/%Y %H:%M') }}.</p>
+</div>
+
+<div class="signature-layout">
+  <div class="card preview-card">
+    <img class="preview-image" src="{{ url_for('user.preview_file', record_id=record.id) }}" alt="Assinatura gerada">
+  </div>
+
+  <div class="card">
+    <h2>Baixar assinatura</h2>
+    <p class="muted">Formato: <strong>{{ record.output_format | upper }}</strong></p>
+    <a class="btn btn--primary btn--block" href="{{ url_for('user.download_file', record_id=record.id) }}">
+      {{ icons.download() }} Baixar imagem
+    </a>
+    <a class="btn btn--secondary btn--block mt-075" href="{{ url_for('main.outlook_help') }}">
+      Como inserir no Outlook
+    </a>
+    <a class="btn btn--ghost btn--block mt-075" href="{{ url_for('user.new_signature') }}">
+      Gerar outra assinatura
+    </a>
+  </div>
+</div>
+{% endblock %}

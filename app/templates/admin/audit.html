@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Auditoria{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard')) }}
+<div class="page-header">
+  <h1>Auditoria de assinaturas</h1>
+  <p class="muted">Todas as assinaturas geradas pelos usuários ficam registradas aqui.
+    <a href="{{ url_for('admin.public_access_log') }}">Ver acessos ao portal público (sem login)</a>.</p>
+</div>
+
+<form method="get" class="filter-bar">
+  <select name="user_id" class="field__input" onchange="this.form.submit()">
+    <option value="">Todos os usuários</option>
+    {% for u in all_users %}
+    <option value="{{ u.id }}" {{ 'selected' if selected_user_id == u.id }}>{{ u.name }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if pagination.items %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Data</th><th>Usuário</th><th>Nome na assinatura</th><th>Função</th><th>Unidade</th><th>E-mail</th><th>Telefone</th><th>Foto</th><th>Formato</th><th>Portal público</th><th></th></tr></thead>
+    <tbody>
+      {% for r in pagination.items %}
+      <tr>
+        <td>{{ r.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>{{ r.user.name if r.user else '—' }}</td>
+        <td>{{ r.full_name }}</td>
+        <td>{{ r.role_title }}</td>
+        <td>{{ r.unit }}</td>
+        <td>{{ r.signature_email }}</td>
+        <td>{{ r.phone }}</td>
+        <td>{{ "Sim" if r.photo_filename else "Não" }}</td>
+        <td>{{ r.output_format | upper }}</td>
+        <td>{% if r.public_downloaded_at %}<span class="badge badge--muted">Baixada {{ r.public_downloaded_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="badge">Disponível</span>{% endif %}</td>
+        <td><a href="{{ url_for('admin.audit_download', record_id=r.id) }}" class="btn btn--small btn--secondary">Baixar</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}<a href="{{ url_for('admin.audit_list', page=pagination.prev_num, user_id=selected_user_id) }}" class="btn btn--small btn--ghost">Anterior</a>{% endif %}
+  <span class="muted">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+  {% if pagination.has_next %}<a href="{{ url_for('admin.audit_list', page=pagination.next_num, user_id=selected_user_id) }}" class="btn btn--small btn--ghost">Próxima</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <h2>Nenhum registro encontrado</h2>
+  <p class="muted">Ainda não há assinaturas geradas para este filtro.</p>
+</div>
+{% endif %}
+{% endblock %}

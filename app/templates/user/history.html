@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Histórico{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.dashboard') if current_user.is_admin else (url_for('admin.batch_import') if current_user.is_supervisor else url_for('user.dashboard'))) }}
+<div class="page-header">
+  <h1>Meu histórico</h1>
+  <p class="muted">Assinaturas geradas anteriormente por você.</p>
+</div>
+
+{% if pagination.items %}
+<div class="table-wrap">
+  <table class="table">
+    <thead>
+      <tr><th>Data</th><th>Nome</th><th>Função</th><th>Foto</th><th>Formato</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for record in pagination.items %}
+      <tr>
+        <td>{{ record.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>{{ record.full_name }}</td>
+        <td>{{ record.role_title }}</td>
+        <td>{{ "Sim" if record.photo_filename else "Não" }}</td>
+        <td>{{ record.output_format | upper }}</td>
+        <td class="table__actions">
+          <a href="{{ url_for('user.result', record_id=record.id) }}" class="btn btn--small btn--secondary">Ver</a>
+          <a href="{{ url_for('user.download_file', record_id=record.id) }}" class="btn btn--small btn--primary">Baixar</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<div class="pagination">
+  {% if pagination.has_prev %}<a href="{{ url_for('user.history', page=pagination.prev_num) }}" class="btn btn--small btn--ghost">Anterior</a>{% endif %}
+  <span class="muted">Página {{ pagination.page }} de {{ pagination.pages }}</span>
+  {% if pagination.has_next %}<a href="{{ url_for('user.history', page=pagination.next_num) }}" class="btn btn--small btn--ghost">Próxima</a>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">
+  <h2>Nenhuma assinatura gerada ainda</h2>
+  <p class="muted">Quando você gerar sua primeira assinatura, ela aparecerá aqui.</p>
+  <a href="{{ url_for('user.new_signature') }}" class="btn btn--primary">Criar minha assinatura</a>
+</div>
+{% endif %}
+{% endblock %}

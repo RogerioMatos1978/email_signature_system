@@ -1,0 +1,25 @@
+{% macro field(f, help_text=None, autocomplete=None) %}
+<div class="field {{ 'field--error' if f.errors }}">
+  {{ f.label(class="field__label") }}
+  {% if autocomplete %}
+    {{ f(class="field__input", autocomplete=autocomplete) }}
+  {% else %}
+    {{ f(class="field__input") }}
+  {% endif %}
+  {% if help_text %}<p class="field__help">{{ help_text }}</p>{% endif %}
+  {% for error in f.errors %}
+    <p class="field__error">{{ error }}</p>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro file_field(f, help_text=None) %}
+<div class="field {{ 'field--error' if f.errors }}">
+  {{ f.label(class="field__label") }}
+  {{ f(class="field__file") }}
+  {% if help_text %}<p class="field__help">{{ help_text }}</p>{% endif %}
+  {% for error in f.errors %}
+    <p class="field__error">{{ error }}</p>
+  {% endfor %}
+</div>
+{% endmacro %}

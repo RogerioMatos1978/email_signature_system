@@ -1,0 +1,169 @@
+import enum
+import json
+from datetime import datetime
+
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+from .extensions import db
+
+
+class Role(str, enum.Enum):
+    ADMIN = "admin"
+    SUPERVISOR = "supervisor"
+    USER = "user"
+
+
+class User(db.Model, UserMixin):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    username = db.Column(db.String(80), nullable=False, unique=True, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default=Role.USER.value, index=True)
+    is_active_flag = db.Column("is_active", db.Boolean, nullable=False, default=True)
+    must_change_password = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+
+    # Token da sessão atualmente válida para este usuário (login único por
+    # conta). A cada novo login, um token novo é gerado e substitui este —
+    # qualquer sessão antiga (com o token anterior) é encerrada automaticamente
+    # na próxima requisição, mesmo sem interação do usuário na sessão antiga.
+    current_session_token = db.Column(db.String(64), nullable=True)
+
+    # Controle de geração de assinatura: após o usuário BAIXAR a assinatura
+    # gerada, este campo vira False e ele não consegue gerar outra — somente o
+    # administrador pode liberar novamente (botão em Admin → Usuários).
+    can_generate_signature = db.Column(db.Boolean, nullable=False, default=True)
+
+    signatures = db.relationship(
+        "SignatureRecord",
+        backref="user",
+        lazy="select",
+        cascade="all, delete-orphan",
+        foreign_keys="SignatureRecord.user_id",
+    )
+
+    def set_password(self, raw_password: str) -> None:
+        self.password_hash = generate_password_hash(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        if not raw_password:
+            return False
+        return check_password_hash(self.password_hash, raw_password)
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == Role.ADMIN.value
+
+    @property
+    def is_supervisor(self) -> bool:
+        return self.role == Role.SUPERVISOR.value
+
+    # Flask-Login usa este atributo para bloquear login de contas desativadas.
+    @property
+    def is_active(self):
+        return self.is_active_flag
+
+    def __repr__(self):
+        return f"<User {self.username!r} role={self.role!r}>"
+
+
+class SignatureTemplate(db.Model):
+    """Modelo de assinatura definido pelo administrador (imagem de fundo + layout)."""
+
+    __tablename__ = "signature_templates"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    # Variante do padrão 2026: "sem_foto" | "com_foto". Existe (no máximo) um
+    # modelo ativo POR variante; o usuário escolhe com/sem foto ao gerar.
+    variant = db.Column(db.String(20), nullable=False, default="sem_foto", index=True)
+    background_filename = db.Column(db.String(255), nullable=False)
+    width = db.Column(db.Integer, nullable=False)
+    height = db.Column(db.Integer, nullable=False)
+    fields_json = db.Column(db.Text, nullable=False, default="{}")
+    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
+    created_by_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_fields(self) -> dict:
+        try:
+            data = json.loads(self.fields_json) if self.fields_json else {}
+            return data if isinstance(data, dict) else {}
+        except (ValueError, TypeError):
+            return {}
+
+    def set_fields(self, data: dict) -> None:
+        self.fields_json = json.dumps(data or {})
+
+    def __repr__(self):
+        return f"<SignatureTemplate {self.name!r} active={self.is_active}>"
+
+
+class SignatureRecord(db.Model):
+    """Registro de auditoria: toda assinatura gerada fica registrada aqui."""
+
+    __tablename__ = "signature_records"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    template_id = db.Column(db.Integer, db.ForeignKey("signature_templates.id"), nullable=True)
+
+    full_name = db.Column(db.String(120), nullable=False)
+    role_title = db.Column(db.String(120), nullable=False)
+    unit = db.Column(db.String(120), nullable=False, default="")  # Unidade/Gerência (padrão 2026)
+    signature_email = db.Column(db.String(190), nullable=False)
+    phone = db.Column(db.String(40), nullable=False)
+
+    photo_filename = db.Column(db.String(255), nullable=True)  # foto do colaborador (variante com_foto)
+    output_filename = db.Column(db.String(255), nullable=False)
+    output_format = db.Column(db.String(4), nullable=False)  # png | jpg
+    status = db.Column(db.String(20), nullable=False, default="success", index=True)
+
+    # Portal público (sem login) de autoatendimento: o colaborador busca pelo
+    # próprio nome e baixa a assinatura já gerada UMA vez. Depois disso este
+    # campo é preenchido e o registro some da busca pública — para baixar de
+    # novo, precisa pedir ao Supervisor/Administrador (que sempre podem baixar
+    # via Auditoria, sem essa trava). Independente de `can_generate_signature`
+    # (que é por USUÁRIO logado); este é por REGISTRO, então não interfere em
+    # nenhum fluxo existente.
+    public_downloaded_at = db.Column(db.DateTime, nullable=True)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    template = db.relationship("SignatureTemplate")
+
+    __table_args__ = (
+        db.Index("ix_signature_records_user_created", "user_id", "created_at"),
+    )
+
+    def __repr__(self):
+        return f"<SignatureRecord user_id={self.user_id} format={self.output_format}>"
+
+
+class PublicAccessLog(db.Model):
+    """Auditoria do portal público (sem login): toda busca por nome e todo
+    download feito por ali fica registrado aqui, com IP de origem. Não
+    interfere na tabela de auditoria normal (SignatureRecord) — é um log
+    complementar, só de leitura para o administrador."""
+
+    __tablename__ = "public_access_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(20), nullable=False, index=True)  # "search" | "download"
+    searched_name = db.Column(db.String(160), nullable=True)
+    record_id = db.Column(
+        db.Integer, db.ForeignKey("signature_records.id", ondelete="SET NULL"), nullable=True
+    )
+    matches_found = db.Column(db.Integer, nullable=True)
+    ip_address = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    record = db.relationship("SignatureRecord")
+
+    def __repr__(self):
+        return f"<PublicAccessLog action={self.action!r} name={self.searched_name!r}>"

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Importar planilha{% endblock %}
+{% block content %}
+{% if current_user.is_admin %}{{ back_btn.back(url_for('admin.dashboard')) }}{% endif %}
+<div class="page-header">
+  <h1>Importar planilha de colaboradores</h1>
+  <p class="muted">Gere as assinaturas <strong>sem foto</strong> de vários colaboradores de uma vez, a partir de uma planilha.</p>
+</div>
+
+{% if not template %}
+<div class="empty-state">
+  <h2>Nenhum modelo "sem foto" ativo</h2>
+  <p class="muted">Peça ao administrador para ativar um modelo da variante "Sem foto" em Admin → Modelos antes de importar.</p>
+</div>
+{% else %}
+<form method="post" enctype="multipart/form-data" novalidate id="batchImportForm">
+  {# Só o CSRF token — fields_json é renderizado manualmente mais abaixo
+     (ver comentário equivalente em admin/template_form.html). #}
+  {{ form.hidden_tag(form.csrf_token) }}
+
+  <div class="signature-layout">
+    <div class="card">
+      {{ fh.file_field(form.spreadsheet, "Formatos aceitos: .xlsx ou .csv (máx. 2MB, até 500 linhas).") }}
+      {{ fh.field(form.output_format) }}
+      <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+    </div>
+
+    <div class="card card--tip">
+      <h2>Formato esperado da planilha</h2>
+      <p class="muted">A primeira linha deve ser o cabeçalho, com estas colunas (a ordem não importa; acentos e maiúsculas são ignorados):</p>
+      <div class="table-wrap mt-05">
+        <table class="table">
+          <thead><tr><th>Nome</th><th>Função</th><th>Unidade</th><th>E-mail</th><th>Telefone</th></tr></thead>
+          <tbody>
+            <tr><td>Maria da Silva</td><td>Analista de RH</td><td>SESI Goiânia</td><td>maria.silva@fieg.com.br</td><td>(62) 91234-5678</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="field__help mt-05">Também são aceitos os nomes de coluna: "Cargo" (função), "Gerência" (unidade), "Fone"/"Celular" (telefone). Todas as assinaturas do lote são geradas na variante <strong>sem foto</strong> e registradas na auditoria. Linhas com erro são ignoradas e listadas no resultado.</p>
+    </div>
+  </div>
+
+  <div class="card editor-card">
+    <h2>Pré-visualização e reposicionamento</h2>
+    <p class="muted">Este é um exemplo de como a assinatura vai ficar, usando o modelo ativo. Arraste os campos para ajustar a posição — use a grade como guia de alinhamento. <strong>Ao importar (ou salvar), o posicionamento escolhido se torna o padrão para todos</strong>: passa a valer também para as assinaturas geradas individualmente pelos usuários padrão, não só para este lote.</p>
+
+    <div class="editor-stage" id="batchStage">
+      <canvas id="batchPreviewCanvas" class="editor-stage__canvas"></canvas>
+      <div class="editor-grid" aria-hidden="true"></div>
+      <div class="editor-marker" data-field="full_name"><span>Nome</span></div>
+      <div class="editor-marker" data-field="role_title"><span>Função</span></div>
+      <div class="editor-marker" data-field="unit"><span>Unidade</span></div>
+      <div class="editor-marker" data-field="signature_email"><span>E-mail</span></div>
+      <div class="editor-marker" data-field="phone"><span>Telefone</span></div>
+    </div>
+
+    <div class="editor-panels" id="batchPanels">
+      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone")] %}
+      <fieldset class="editor-panel" data-field-panel="{{ key }}">
+        <legend>{{ label }}</legend>
+        <label>Tamanho da fonte <input type="number" min="8" max="72" step="0.1" data-prop="font_size" value="18"></label>
+        <label>Cor <input type="color" data-prop="color" value="#FFFFFF"></label>
+        <label>Alinhamento
+          <select data-prop="align">
+            <option value="left">Esquerda</option>
+            <option value="center">Centro</option>
+            <option value="right">Direita</option>
+          </select>
+        </label>
+        <label class="editor-panel__checkbox"><input type="checkbox" data-prop="bold"> Negrito</label>
+        <label>Largura máx. do texto (%) <input type="range" min="10" max="100" data-prop="box_width_pct_pct" value="42"></label>
+      </fieldset>
+      {% endfor %}
+    </div>
+
+    <div class="btn-row" style="display:flex; gap:.75rem; flex-wrap:wrap; margin-top:.5rem;">
+      <button type="button" id="batchResetBtn" class="btn btn--ghost">Restaurar posições do modelo</button>
+      <button type="submit" formnovalidate formaction="{{ url_for('admin.batch_import_save_positions') }}" class="btn btn--secondary">Salvar só o posicionamento (sem importar planilha)</button>
+    </div>
+  </div>
+
+  {{ form.fields_json(id="batchFieldsJsonInput") }}
+</form>
+
+<script type="application/json" id="batchInitialData">
+{{ {
+  "backgroundUrl": url_for('main.template_background', template_id=template.id),
+  "width": template.width,
+  "height": template.height,
+  "fields": template.get_fields()
+} | tojson }}
+</script>
+{% endif %}
+
+{% if zip_name %}
+<div class="card mt-1-5">
+  <h2>{{ generated }} assinatura(s) pronta(s)</h2>
+  <a class="btn btn--primary" href="{{ url_for('admin.batch_import_download', zip_name=zip_name) }}">Baixar ZIP com as assinaturas</a>
+</div>
+{% endif %}
+
+{% if errors %}
+<div class="card mt-1-5">
+  <h2>Linhas ignoradas ({{ errors | length }})</h2>
+  <ul class="muted">
+    {% for err in errors %}
+    <li>{{ err }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if template %}
+<script src="{{ url_for('static', filename='js/batch_preview.js') }}"></script>
+{% endif %}
+{% endblock %}
