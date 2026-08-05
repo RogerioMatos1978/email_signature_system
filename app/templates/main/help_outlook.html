@@ -1,10 +1,36 @@
 {% extends "base.html" %}
 {% import "_icons.html" as icons %}
 {% block title %}Como usar no Outlook{% endblock %}
+
+{% macro result_item(record) %}
+<li class="public-search__result">
+  <div>
+    <strong>{{ record.full_name }}</strong>
+    <span class="muted">— {{ record.role_title }}{% if record.unit %} · {{ record.unit }}{% endif %}</span>
+  </div>
+  {% if record.public_downloaded_at %}
+    <span class="badge badge--muted">Já baixada em {{ record.public_downloaded_at.strftime('%d/%m/%Y') }} — solicite ao Supervisor/Administrador</span>
+  {% else %}
+    <form method="post" action="{{ url_for('main.public_download', record_id=record.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="btn btn--secondary btn--small">{{ icons.download("icon") }}<span>Baixar assinatura</span></button>
+    </form>
+  {% endif %}
+</li>
+{% endmacro %}
+
 {% block content %}
-<div class="page-header">
-  <h1>Como inserir sua assinatura no Outlook</h1>
-  <p class="muted">Depois de gerar sua imagem (PNG ou JPG), baixe o arquivo e siga o passo a passo abaixo, conforme a versão do Outlook que você usa.</p>
+<div class="page-header page-header--row">
+  <div>
+    <h1>Como inserir sua assinatura no Outlook</h1>
+    <p class="muted">Depois de gerar sua imagem (PNG ou JPG), baixe o arquivo e siga o passo a passo abaixo, conforme a versão do Outlook que você usa.</p>
+  </div>
+  <div class="btn-row" style="margin-top:0;">
+    <a href="{{ url_for('main.outlook_help', nome=query_name) if query_name else url_for('main.outlook_help') }}" class="btn btn--ghost">{{ icons.refresh("icon") }}<span>Atualizar página</span></a>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.login') }}" class="btn btn--primary">{{ icons.login("icon") }}<span>Entrar no sistema</span></a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card card--tip">
@@ -19,24 +45,29 @@
     {% if matches|length == 0 %}
       <p class="muted mt-1">Nenhuma assinatura encontrada para "{{ query_name }}". Confira a digitação do nome ou peça ao Supervisor/Administrador para verificar se ela já foi gerada.</p>
     {% else %}
+      {% set available = matches | rejectattr('public_downloaded_at') | list %}
+      {% set downloaded = matches | selectattr('public_downloaded_at') | sort(attribute='public_downloaded_at', reverse=True) | list %}
+
+      {% if available %}
       <ul class="public-search__results mt-1">
-        {% for record in matches %}
-        <li class="public-search__result">
-          <div>
-            <strong>{{ record.full_name }}</strong>
-            <span class="muted">— {{ record.role_title }}{% if record.unit %} · {{ record.unit }}{% endif %}</span>
-          </div>
-          {% if record.public_downloaded_at %}
-            <span class="badge badge--muted">Já baixada em {{ record.public_downloaded_at.strftime('%d/%m/%Y') }} — solicite ao Supervisor/Administrador</span>
-          {% else %}
-            <form method="post" action="{{ url_for('main.public_download', record_id=record.id) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button type="submit" class="btn btn--secondary btn--small">{{ icons.download("icon") }}<span>Baixar assinatura</span></button>
-            </form>
-          {% endif %}
-        </li>
-        {% endfor %}
+        {% for record in available %}{{ result_item(record) }}{% endfor %}
       </ul>
+      {% endif %}
+
+      {% if downloaded %}
+      <ul class="public-search__results {{ 'mt-1' if not available }}{{ ' mt-05' if available }}">
+        {{ result_item(downloaded[0]) }}
+      </ul>
+      {% if downloaded|length > 1 %}
+      <details class="public-search__more">
+        <summary>{{ icons.download("icon") }}<span>Ver mais {{ downloaded|length - 1 }} assinatura(s) já baixada(s)</span></summary>
+        <ul class="public-search__results mt-05">
+          {% for record in downloaded[1:] %}{{ result_item(record) }}{% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      {% endif %}
+
       <p class="field__help mt-05">Depois de baixada, a assinatura não fica mais disponível aqui — guarde bem o arquivo. Se precisar de novo, peça ao Supervisor ou Administrador para reenviar por WhatsApp.</p>
     {% endif %}
   {% endif %}

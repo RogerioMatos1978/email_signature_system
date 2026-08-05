@@ -340,6 +340,23 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
 }
 .public-search__result form { margin: 0; }
 
+.public-search__more { margin-top: .6rem; }
+.public-search__more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--muted);
+  list-style: none;
+}
+.public-search__more summary::-webkit-details-marker { display: none; }
+.public-search__more summary::marker { content: ""; }
+.public-search__more summary:hover { color: var(--primary); }
+.public-search__more summary .icon { width: 16px; height: 16px; }
+.public-search__more[open] summary { margin-bottom: .5rem; color: var(--primary); }
+
 /* ---------------------------------------------------------------- flash */
 .flash-stack { margin-bottom: 1.25rem; display: flex; flex-direction: column; gap: .5rem; }
 .flash { padding: .8rem 1rem; border-radius: var(--radius-sm); font-weight: 600; font-size: .9rem; }

@@ -60,6 +60,12 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v1.9.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). A página pública "Como usar
+> no Outlook" ganhou botões de "Entrar no sistema" e "Atualizar página", e a
+> busca de assinatura passou a recolher as já baixadas (só a mais recente fica
+> visível, com um "Ver mais" para as demais).
+
 > **Atualizando de uma instalação anterior à v1.8.1?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). O alinhamento (posição x/y)
 > das duas variantes foi revisado direto do PowerPoint original — mais preciso
@@ -176,7 +182,9 @@ Fonte oficial: [Microsoft Support — How to add and change an email signature i
 
 A mesma página "Como usar no Outlook" tem um campo de busca por nome — pensado para colaboradores que não têm conta no sistema (por exemplo, quem recebeu a assinatura via importação em lote do Supervisor). Basta digitar o nome completo (mínimo 3 caracteres); o sistema mostra as assinaturas com nome parecido (nome, função e unidade, sem expor e-mail/telefone na lista) e o colaborador baixa a que for dele.
 
-Cada assinatura só pode ser baixada **uma vez** por esse caminho — depois disso o botão de download desaparece e aparece uma mensagem indicando que é preciso pedir ao Supervisor ou Administrador para baixá-la novamente (em Auditoria) e reenviar por WhatsApp, sem perda de qualidade. Toda busca e todo download feitos ali ficam registrados (com IP de origem) em **Admin → Auditoria → "Ver acessos ao portal público"**. A busca é limitada por IP (`30/min` para buscar, `20/min` para baixar) para dificultar varredura automatizada de nomes.
+Cada assinatura só pode ser baixada **uma vez** por esse caminho — depois disso ela some da lista de "disponíveis" e vira uma entrada "já baixada". Quando a busca encontra mais de uma assinatura já baixada (ex.: a mesma pessoa gerou em datas diferentes), só a mais recente fica visível; as demais ficam atrás de um "Ver mais" para não poluir a lista. Toda busca e todo download feitos ali ficam registrados (com IP de origem) em **Admin → Auditoria → "Ver acessos ao portal público"**. A busca é limitada por IP (`30/min` para buscar, `20/min` para baixar) para dificultar varredura automatizada de nomes.
+
+A página também tem um botão **"Entrar no sistema"** (para quem ainda não tem sessão ativa) e um botão **"Atualizar página"** para recarregar a busca.
 
 ## Tema escuro
 

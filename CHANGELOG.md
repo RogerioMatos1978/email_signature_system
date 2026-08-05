@@ -2,6 +2,12 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.9.0] — 2026-08-05
+
+### Adicionado
+- Na página pública "Como usar no Outlook" (`/ajuda/outlook`): botão **"Entrar no sistema"** (visível só para quem não está logado, leva à tela de login) e botão **"Atualizar página"** (recarrega a página preservando a busca em andamento, se houver).
+- **Assinaturas já baixadas pela busca pública agora ficam recolhidas**: quando a busca por nome encontra mais de uma assinatura já baixada, só a mais recente fica visível por padrão — as demais ficam dentro de um "Ver mais N assinatura(s) já baixada(s)" que expande/recolhe ao clicar (usando `<details>`/`<summary>` nativo do HTML, sem depender de JavaScript). Assinaturas ainda disponíveis para baixar continuam sempre todas visíveis.
+
 ## [1.8.1] — 2026-08-05
 
 ### Corrigido
