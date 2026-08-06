@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Liberar assinaturas{% endblock %}
+{% block content %}
+{% if current_user.is_admin %}{{ back_btn.back(url_for('admin.dashboard')) }}{% endif %}
+<div class="page-header">
+  <h1>Liberar assinaturas</h1>
+  <p class="muted">Usuários padrão que já geraram e baixaram a própria assinatura ficam bloqueados até serem liberados aqui — por um Administrador ou um Supervisor.</p>
+</div>
+
+{% if blocked %}
+<div class="table-wrap">
+  <table class="table">
+    <thead><tr><th>Nome</th><th>Usuário</th><th></th></tr></thead>
+    <tbody>
+      {% for u in blocked %}
+      <tr>
+        <td>{{ u.name }}</td>
+        <td>{{ u.username }}</td>
+        <td class="table__actions">
+          <form method="post" action="{{ url_for('admin.user_allow_signature', user_id=u.id) }}" onsubmit="return confirm('Liberar este usuário para gerar uma nova assinatura?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn--small btn--primary">Liberar assinatura</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state">
+  <h2>Nenhum usuário bloqueado</h2>
+  <p class="muted">Todos os usuários padrão estão liberados para gerar assinatura no momento.</p>
+</div>
+{% endif %}
+{% endblock %}

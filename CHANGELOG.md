@@ -2,6 +2,12 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.9.1] — 2026-08-06
+
+### Adicionado
+- **Supervisor agora também pode liberar usuários padrão bloqueados** para gerar uma nova assinatura (antes só o Administrador podia). Nova tela enxuta **"Liberar assinaturas"** (no menu do Supervisor) lista só os usuários padrão bloqueados no momento, com um botão "Liberar assinatura" cada — sem dar ao Supervisor acesso ao cadastro completo de usuários (criar, editar, resetar senha e excluir continuam exclusivos do Administrador, em Admin → Usuários).
+- O Administrador continua liberando pela tela de Usuários, como antes — nada muda no fluxo dele.
+
 ## [1.9.0] — 2026-08-05
 
 ### Adicionado

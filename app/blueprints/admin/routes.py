@@ -356,11 +356,27 @@ def user_reset_password(user_id):
     return redirect(url_for("admin.users_list"))
 
 
+@admin_bp.route("/usuarios/liberar-assinaturas")
+@supervisor_or_admin_required
+def blocked_users():
+    """Tela enxuta (Admin ou Supervisor) para liberar usuários padrão que já
+    geraram e baixaram a própria assinatura — sem dar ao Supervisor acesso ao
+    cadastro completo de usuários (criar/editar/excluir/resetar senha
+    continuam exclusivos do Admin, em Admin → Usuários)."""
+    blocked = (
+        User.query.filter_by(role=Role.USER.value, can_generate_signature=False, is_active_flag=True)
+        .order_by(User.name.asc())
+        .all()
+    )
+    return render_template("admin/blocked_users.html", blocked=blocked)
+
+
 @admin_bp.route("/usuarios/<int:user_id>/liberar-assinatura", methods=["POST"])
-@admin_required
+@supervisor_or_admin_required
 def user_allow_signature(user_id):
     """Libera o usuário para gerar uma nova assinatura (após ele já ter
-    baixado a anterior, o que bloqueia automaticamente novas gerações)."""
+    baixado a anterior, o que bloqueia automaticamente novas gerações).
+    Acessível também ao Supervisor — não só ao Administrador."""
     user = User.query.get_or_404(user_id)
     if user.can_generate_signature:
         flash(f"{user.name} já está liberado para gerar assinatura.", "info")
@@ -368,7 +384,10 @@ def user_allow_signature(user_id):
         user.can_generate_signature = True
         db.session.commit()
         flash(f"{user.name} liberado para gerar uma nova assinatura.", "success")
-    return redirect(url_for("admin.users_list", page=request.args.get("page", 1)))
+
+    if current_user.is_admin:
+        return redirect(url_for("admin.users_list", page=request.args.get("page", 1)))
+    return redirect(url_for("admin.blocked_users"))
 
 
 @admin_bp.route("/usuarios/<int:user_id>/excluir", methods=["POST"])

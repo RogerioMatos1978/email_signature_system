@@ -48,6 +48,7 @@
       {% elif current_user.is_supervisor %}
         <a href="{{ url_for('user.new_signature') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.new_signature' }}">{{ icons.envelope() }}<span>Gerar assinatura</span></a>
         <a href="{{ url_for('admin.batch_import') }}" class="nav__link {{ 'is-active' if request.endpoint and request.endpoint.startswith('admin.batch_import') }}">{{ icons.history() }}<span>Importar planilha</span></a>
+        <a href="{{ url_for('admin.blocked_users') }}" class="nav__link {{ 'is-active' if request.endpoint == 'admin.blocked_users' }}">{{ icons.check() }}<span>Liberar assinaturas</span></a>
       {% else %}
         <a href="{{ url_for('user.dashboard') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.dashboard' }}">{{ icons.dashboard() }}<span>Início</span></a>
         <a href="{{ url_for('user.new_signature') }}" class="nav__link {{ 'is-active' if request.endpoint == 'user.new_signature' }}">{{ icons.envelope() }}<span>Nova assinatura</span></a>

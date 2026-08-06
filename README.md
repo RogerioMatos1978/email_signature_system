@@ -60,6 +60,11 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v1.9.1?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidade: o Supervisor agora
+> também pode liberar usuários padrão bloqueados (tela nova "Liberar
+> assinaturas" no menu dele) — antes só o Administrador conseguia.
+
 > **Atualizando de uma instalação anterior à v1.9.0?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). A página pública "Como usar
 > no Outlook" ganhou botões de "Entrar no sistema" e "Atualizar página", e a
@@ -156,6 +161,7 @@ O sistema tem três papéis:
 **Supervisor:**
 - Acesso a **Gerar assinatura** (individual, com ou sem foto, para qualquer colaborador) e **Importar planilha** (em lote) — não vê Modelos, Usuários nem Auditoria completa.
 - Antes de importar em lote, pode visualizar um **exemplo de assinatura** sobre o modelo ativo e **arrastar os campos** para reposicioná-los, com uma grade de alinhamento como guia. **O ajuste salvo vira o novo padrão do modelo** — vale para todas as assinaturas seguintes, geradas em lote ou individualmente pelos usuários padrão. É possível salvar só o posicionamento (botão dedicado), sem precisar importar uma planilha no mesmo momento.
+- Também pode **liberar usuários padrão bloqueados** para gerar uma nova assinatura (tela "Liberar assinaturas") — sem acesso ao restante do cadastro de usuários (criar, editar, resetar senha, excluir continuam só do Admin).
 
 **Usuário padrão:**
 1. Acessa **Nova assinatura** e preenche: nome completo, função, unidade/gerência, e-mail e telefone.
@@ -163,7 +169,7 @@ O sistema tem três papéis:
 3. Acompanha a pré-visualização em tempo real, logo abaixo do formulário, atualizada a cada campo digitado (o fundo troca automaticamente ao marcar/desmarcar "com foto").
 4. Ao enviar, o sistema **pede confirmação** ("está tudo correto?") mostrando a imagem final antes de gravar definitivamente.
 5. Ao confirmar, a assinatura é registrada na página de auditoria e liberada para download em PNG ou JPG.
-6. **Ao baixar a assinatura, a geração de novas assinaturas é bloqueada para o usuário** — somente o administrador pode liberá-lo de novo (botão "Liberar assinatura" em Admin → Usuários). O histórico e o download da assinatura já gerada continuam disponíveis.
+6. **Ao baixar a assinatura, a geração de novas assinaturas é bloqueada para o usuário** — o Administrador (em Admin → Usuários) ou o Supervisor (em Liberar assinaturas) podem liberá-lo de novo. O histórico e o download da assinatura já gerada continuam disponíveis.
 
 **Importação em lote (Admin ou Supervisor → Importar planilha):** para gerar várias assinaturas **sem foto** de uma vez (ex.: onboarding de um grupo de colaboradores), envie uma planilha `.xlsx` ou `.csv` com as colunas Nome, Função, Unidade, E-mail e Telefone. Os arquivos gerados usam o **nome do colaborador** (não um código aleatório). O sistema gera todas, registra na auditoria e devolve um ZIP para download; linhas com erro (e-mail inválido, campo vazio) são listadas e não travam as demais.
 
