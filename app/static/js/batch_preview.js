@@ -31,13 +31,14 @@
     return;
   }
 
-  var FIELD_KEYS = ["full_name", "role_title", "unit", "signature_email", "phone"];
+  var FIELD_KEYS = ["full_name", "role_title", "unit", "signature_email", "phone", "whatsapp"];
   var SAMPLE_VALUES = {
     full_name: "Nome do Colaborador Exemplo",
     role_title: "Cargo de Exemplo",
-    unit: "Unidade de Exemplo",
+    unit: "UI Rio Verde - Sesi Senai",
     signature_email: "exemplo.colaborador@fieg.com.br",
     phone: "(62) 00000-0000",
+    whatsapp: "(62) 90000-0000",
   };
 
   var savedFields = initial.fields || {};

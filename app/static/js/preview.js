@@ -41,6 +41,7 @@
     unit: form.querySelector("#unit"),
     signature_email: form.querySelector("#signature_email"),
     phone: form.querySelector("#phone"),
+    whatsapp: form.querySelector("#whatsapp"),
   };
   var photoInput = form.querySelector("#photo");
   var withPhotoCheckbox = form.querySelector("#with_photo");
@@ -138,7 +139,7 @@
     ctx.drawImage(bg.img, 0, 0, canvas.width, canvas.height);
 
     var fields = variant.fields || {};
-    ["full_name", "role_title", "unit", "signature_email", "phone"].forEach(function (key) {
+    ["full_name", "role_title", "unit", "signature_email", "phone", "whatsapp"].forEach(function (key) {
       drawField(key, fields[key] || {});
     });
 

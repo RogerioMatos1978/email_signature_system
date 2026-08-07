@@ -18,7 +18,7 @@
   if (!stage || !hiddenInput || !form) return;
 
   // Padrões FIEG 2026 — mesmos valores de app/utils/template_fields.py.
-  var TEXT_KEYS = ["full_name", "role_title", "unit", "signature_email", "phone"];
+  var TEXT_KEYS = ["full_name", "role_title", "unit", "signature_email", "phone", "whatsapp"];
   var AZUL = "#008BD2";
   var BRANCO = "#FFFFFF";
 
@@ -34,6 +34,7 @@
       unit: { x_pct: x, y_pct: 0.5004, font_size: 29.4, bold: true, align: "left", color: BRANCO, max_chars: 45, box_width_pct: boxWidth },
       signature_email: { x_pct: x, y_pct: 0.5815, font_size: 29.4, bold: false, align: "left", color: BRANCO, max_chars: 50, box_width_pct: boxWidth },
       phone: { x_pct: x, y_pct: 0.6609, font_size: 29.4, bold: false, align: "left", color: BRANCO, max_chars: 30, box_width_pct: boxWidth },
+      whatsapp: { x_pct: x, y_pct: 0.7403, font_size: 29.4, bold: false, align: "left", color: BRANCO, max_chars: 30, box_width_pct: boxWidth },
     };
   }
 

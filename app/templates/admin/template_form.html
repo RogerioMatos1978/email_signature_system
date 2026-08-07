@@ -45,11 +45,12 @@
       <div class="editor-marker is-hidden" data-field="unit"><span>Unidade</span></div>
       <div class="editor-marker is-hidden" data-field="signature_email"><span>E-mail</span></div>
       <div class="editor-marker is-hidden" data-field="phone"><span>Telefone</span></div>
+      <div class="editor-marker is-hidden" data-field="whatsapp"><span>WhatsApp</span></div>
       <div class="editor-marker editor-marker--qr is-hidden" data-field="photo"><span>Foto</span></div>
     </div>
 
     <div class="editor-panels" id="editorPanels">
-      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone")] %}
+      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone"), ("whatsapp","WhatsApp")] %}
       <fieldset class="editor-panel" data-field-panel="{{ key }}">
         <legend>{{ label }}</legend>
         <label>Tamanho da fonte <input type="number" min="8" max="72" step="0.1" data-prop="font_size" value="18"></label>

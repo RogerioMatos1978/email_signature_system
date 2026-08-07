@@ -27,9 +27,16 @@
       {{ form.hidden_tag() }}
       {{ fh.field(form.full_name) }}
       {{ fh.field(form.role_title) }}
-      {{ fh.field(form.unit, "Ex.: SESI Campinas, Gerência de TI") }}
+      {{ fh.field(form.unit) }}
       {{ fh.field(form.signature_email) }}
       {{ fh.field(form.phone, "Ex.: (62) 91234-5678") }}
+      {{ fh.field(form.whatsapp, "Ex.: (62) 91234-5678 — deixe em branco se não usar um segundo telefone.") }}
+
+      <div class="field">
+        <label class="editor-panel__checkbox field__label">
+          {{ form.with_icons(id="with_icons") }} {{ form.with_icons.label.text }}
+        </label>
+      </div>
 
       {% if templates.com_foto %}
       <div class="field">
@@ -64,13 +71,13 @@
       "backgroundUrl": url_for('main.template_background', template_id=templates.sem_foto.id),
       "width": templates.sem_foto.width,
       "height": templates.sem_foto.height,
-      "fields": templates.sem_foto.get_fields()
+      "fields": templates.sem_foto.get_merged_fields()
     } if templates.sem_foto else none),
     "com_foto": ({
       "backgroundUrl": url_for('main.template_background', template_id=templates.com_foto.id),
       "width": templates.com_foto.width,
       "height": templates.com_foto.height,
-      "fields": templates.com_foto.get_fields()
+      "fields": templates.com_foto.get_merged_fields()
     } if templates.com_foto else none)
   }
 } | tojson }}

@@ -28,9 +28,20 @@ integralmente no servidor.
 """
 import json
 
-TEXT_FIELD_KEYS = ("full_name", "role_title", "unit", "signature_email", "phone")
+# "whatsapp" é um campo novo (v2.0.0), sem equivalente no PPTX original —
+# posicionado logo abaixo do Telefone, com o mesmo estilo dele (mesma fonte/
+# cor/tamanho), já que representa um segundo telefone opcional.
+TEXT_FIELD_KEYS = ("full_name", "role_title", "unit", "signature_email", "phone", "whatsapp")
 VARIANTS = ("sem_foto", "com_foto")
 VARIANT_LABELS = {"sem_foto": "Sem foto", "com_foto": "Com foto"}
+
+# Unidade / Gerência (v2.0.0): deixou de ser texto livre e virou uma lista
+# fixa de opções — hoje só "UI Rio Verde - Sesi Senai", mas a lista está
+# pronta para receber mais unidades no futuro (basta adicionar tuplas aqui).
+UNIT_CHOICES = [
+    ("UI Rio Verde - Sesi Senai", "UI Rio Verde - Sesi Senai"),
+]
+DEFAULT_UNIT = UNIT_CHOICES[0][0]
 
 _AZUL_FIEG = "#008BD2"
 _BRANCO = "#FFFFFF"
@@ -44,6 +55,7 @@ _SEM_FOTO_TEXT = {
     "unit":            {"x_pct": 0.0514, "y_pct": 0.5004, "font_size": 29.4, "bold": True,  "align": "left", "color": _BRANCO,   "max_chars": 45, "box_width_pct": 0.42},
     "signature_email": {"x_pct": 0.0514, "y_pct": 0.5815, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 50, "box_width_pct": 0.42},
     "phone":           {"x_pct": 0.0514, "y_pct": 0.6609, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 30, "box_width_pct": 0.42},
+    "whatsapp":        {"x_pct": 0.0514, "y_pct": 0.7403, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 30, "box_width_pct": 0.42},
 }
 
 # --------------------------------------------------------------------------
@@ -60,6 +72,7 @@ _COM_FOTO_TEXT = {
     "unit":            {"x_pct": 0.2284, "y_pct": 0.5004, "font_size": 29.4, "bold": True,  "align": "left", "color": _BRANCO,   "max_chars": 45, "box_width_pct": 0.28},
     "signature_email": {"x_pct": 0.2284, "y_pct": 0.5815, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 50, "box_width_pct": 0.28},
     "phone":           {"x_pct": 0.2284, "y_pct": 0.6609, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 30, "box_width_pct": 0.28},
+    "whatsapp":        {"x_pct": 0.2284, "y_pct": 0.7403, "font_size": 29.4, "bold": False, "align": "left", "color": _BRANCO,   "max_chars": 30, "box_width_pct": 0.28},
 }
 
 _COM_FOTO_PHOTO = {

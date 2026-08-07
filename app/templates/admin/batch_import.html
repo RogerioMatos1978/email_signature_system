@@ -24,6 +24,12 @@
     <div class="card">
       {{ fh.file_field(form.spreadsheet, "Formatos aceitos: .xlsx ou .csv (máx. 2MB, até 500 linhas).") }}
       {{ fh.field(form.output_format) }}
+      <div class="field">
+        <label class="editor-panel__checkbox field__label">
+          {{ form.with_icons(id="batch_with_icons") }} {{ form.with_icons.label.text }}
+        </label>
+        <p class="field__help">Se a planilha tiver uma coluna de WhatsApp, o número só entra na assinatura quando esta opção está marcada — desmarcada, o número é ignorado mesmo estando na planilha.</p>
+      </div>
       <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
     </div>
 
@@ -32,13 +38,13 @@
       <p class="muted">A primeira linha deve ser o cabeçalho, com estas colunas (a ordem não importa; acentos e maiúsculas são ignorados):</p>
       <div class="table-wrap mt-05">
         <table class="table">
-          <thead><tr><th>Nome</th><th>Função</th><th>Unidade</th><th>E-mail</th><th>Telefone</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Função</th><th>E-mail</th><th>Telefone</th><th>WhatsApp (opcional)</th></tr></thead>
           <tbody>
-            <tr><td>Maria da Silva</td><td>Analista de RH</td><td>SESI Goiânia</td><td>maria.silva@fieg.com.br</td><td>(62) 91234-5678</td></tr>
+            <tr><td>Maria da Silva</td><td>Analista de RH</td><td>maria.silva@fieg.com.br</td><td>(62) 91234-5678</td><td>(62) 90000-0000</td></tr>
           </tbody>
         </table>
       </div>
-      <p class="field__help mt-05">Também são aceitos os nomes de coluna: "Cargo" (função), "Gerência" (unidade), "Fone"/"Celular" (telefone). Todas as assinaturas do lote são geradas na variante <strong>sem foto</strong> e registradas na auditoria. Linhas com erro são ignoradas e listadas no resultado.</p>
+      <p class="field__help mt-05">Também são aceitos os nomes de coluna: "Cargo" (função), "Fone"/"Celular" (telefone), "Zap"/"Segundo telefone" (WhatsApp). A coluna "Unidade"/"Gerência", se existir na planilha, é <strong>ignorada</strong> — a Unidade / Gerência de todas as assinaturas do lote é sempre "{{ unit_label }}". Todas as assinaturas do lote são geradas na variante <strong>sem foto</strong> e registradas na auditoria. Linhas com erro são ignoradas e listadas no resultado.</p>
     </div>
   </div>
 
@@ -54,10 +60,11 @@
       <div class="editor-marker" data-field="unit"><span>Unidade</span></div>
       <div class="editor-marker" data-field="signature_email"><span>E-mail</span></div>
       <div class="editor-marker" data-field="phone"><span>Telefone</span></div>
+      <div class="editor-marker" data-field="whatsapp"><span>WhatsApp</span></div>
     </div>
 
     <div class="editor-panels" id="batchPanels">
-      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone")] %}
+      {% for key, label in [("full_name","Nome completo"), ("role_title","Função"), ("unit","Unidade / Gerência"), ("signature_email","E-mail"), ("phone","Telefone"), ("whatsapp","WhatsApp")] %}
       <fieldset class="editor-panel" data-field-panel="{{ key }}">
         <legend>{{ label }}</legend>
         <label>Tamanho da fonte <input type="number" min="8" max="72" step="0.1" data-prop="font_size" value="18"></label>
@@ -89,7 +96,7 @@
   "backgroundUrl": url_for('main.template_background', template_id=template.id),
   "width": template.width,
   "height": template.height,
-  "fields": template.get_fields()
+  "fields": template.get_merged_fields()
 } | tojson }}
 </script>
 {% endif %}

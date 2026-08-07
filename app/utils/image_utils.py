@@ -73,6 +73,91 @@ def _fit_text(draw: "ImageDraw.ImageDraw", text: str, bold: bool, max_width: int
     return font, (truncated + "…") if truncated and truncated != text else (truncated or text[:1])
 
 
+# ---------------------------------------------------------------------------
+# Ícones (e-mail / telefone / WhatsApp) — desenhados proceduralmente com PIL,
+# não com glifos Unicode: a fonte Neo Sans embutida no PPTX oficial não tem
+# cobertura de símbolos (envelope, telefone etc.), então usar caracteres como
+# "✉" ou "☎" resultaria em um quadrado vazio ("tofu") na imagem final. Cada
+# ícone é desenhado numa tela em resolução 4x (supersampling) e depois
+# reduzido com LANCZOS — isso deixa os traços suaves, sem serrilhado.
+# ---------------------------------------------------------------------------
+_ICON_SUPERSAMPLE = 4
+
+
+def _hex_to_rgba(hex_color: str, alpha: int = 255) -> tuple:
+    hex_color = (hex_color or "#FFFFFF").lstrip("#")
+    if len(hex_color) != 6:
+        hex_color = "FFFFFF"
+    return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16), alpha)
+
+
+def _new_icon_canvas(size_px: int):
+    ss = max(4, size_px * _ICON_SUPERSAMPLE)
+    return Image.new("RGBA", (ss, ss), (0, 0, 0, 0)), ss
+
+
+def _draw_envelope_icon(size_px: int, color: str) -> "Image.Image":
+    """E-mail: retângulo (corpo do envelope) + linha em "V" (aba)."""
+    canvas, ss = _new_icon_canvas(size_px)
+    d = ImageDraw.Draw(canvas)
+    rgba = _hex_to_rgba(color)
+    line_w = max(2, int(ss * 0.045))
+    pad_x = int(ss * 0.06)
+    top = int(ss * 0.22)
+    bottom = ss - top
+    left, right = pad_x, ss - pad_x
+    d.rectangle([left, top, right, bottom], outline=rgba, width=line_w)
+    flap_bottom = top + (bottom - top) * 0.62
+    d.line([(left, top), (ss / 2, flap_bottom), (right, top)], fill=rgba, width=line_w, joint="curve")
+    return canvas.resize((size_px, size_px), Image.LANCZOS)
+
+
+def _draw_phone_icon(size_px: int, color: str) -> "Image.Image":
+    """Telefone: traço diagonal arredondado com "bolhas" nas pontas (fone/
+    receiver simplificado) — mesmo espírito de ícone de linha do envelope."""
+    canvas, ss = _new_icon_canvas(size_px)
+    d = ImageDraw.Draw(canvas)
+    rgba = _hex_to_rgba(color)
+    line_w = max(2, int(ss * 0.16))
+    p1 = (ss * 0.22, ss * 0.80)
+    p2 = (ss * 0.42, ss * 0.56)
+    p3 = (ss * 0.58, ss * 0.44)
+    p4 = (ss * 0.78, ss * 0.20)
+    d.line([p1, p2, p3, p4], fill=rgba, width=line_w, joint="curve")
+    end_r = line_w * 0.62
+    for cx, cy in (p1, p4):
+        d.ellipse([cx - end_r, cy - end_r, cx + end_r, cy + end_r], fill=rgba)
+    return canvas.resize((size_px, size_px), Image.LANCZOS)
+
+
+def _draw_whatsapp_icon(size_px: int, color: str) -> "Image.Image":
+    """WhatsApp: balão de conversa (retângulo arredondado + "rabinho")."""
+    canvas, ss = _new_icon_canvas(size_px)
+    d = ImageDraw.Draw(canvas)
+    rgba = _hex_to_rgba(color)
+    line_w = max(2, int(ss * 0.09))
+    pad = int(ss * 0.10)
+    left, top, right, bottom = pad, pad, ss - pad, int(ss * 0.72)
+    radius = int((bottom - top) * 0.32)
+    d.rounded_rectangle([left, top, right, bottom], radius=radius, outline=rgba, width=line_w)
+    tail_w = (right - left) * 0.22
+    tail = [
+        (left + (right - left) * 0.20, bottom - line_w * 0.5),
+        (left + (right - left) * 0.10, ss - pad * 0.3),
+        (left + (right - left) * 0.20 + tail_w, bottom - line_w * 0.5),
+    ]
+    d.polygon(tail, fill=rgba)
+    return canvas.resize((size_px, size_px), Image.LANCZOS)
+
+
+# Só os campos "de contato" recebem ícone — Nome/Função/Unidade nunca têm um.
+_ICON_DRAWERS = {
+    "signature_email": _draw_envelope_icon,
+    "phone": _draw_phone_icon,
+    "whatsapp": _draw_whatsapp_icon,
+}
+
+
 def render_signature(
     background_path: str,
     fields_config: dict,
@@ -83,15 +168,19 @@ def render_signature(
     max_width: int = 1300,
     jpeg_quality: int = 88,
     variant: str = "sem_foto",
+    with_icons: bool = False,
 ) -> None:
     """Gera a imagem final da assinatura e salva em output_path.
 
     - background_path: caminho absoluto da imagem de fundo do modelo ativo
     - fields_config: dict retornado por SignatureTemplate.get_fields()
-    - values: dict com full_name/role_title/unit/signature_email/phone validados
+    - values: dict com full_name/role_title/unit/signature_email/phone/whatsapp
     - photo_path: caminho absoluto da foto do colaborador (variante com_foto), ou None
     - output_format: "png" ou "jpg"
     - variant: "sem_foto" | "com_foto" (define os padrões de posição/cor)
+    - with_icons: se True, desenha um ícone antes de e-mail/telefone/whatsapp
+      (só quando o campo estiver alinhado à esquerda — os únicos casos usados
+      hoje pelos padrões FIEG 2026)
     """
     variant = normalize_variant(variant)
     defaults = DEFAULTS_BY_VARIANT[variant]
@@ -124,20 +213,40 @@ def render_signature(
         y = int(float(cfg.get("y_pct", 0.5)) * canvas_h)
         max_box_width = max(20, int(float(cfg.get("box_width_pct", 0.6)) * canvas_w))
 
+        align = cfg.get("align", "left")
+        color = cfg.get("color") or "#1f2937"
+
+        # Ícone (opcional): só para e-mail/telefone/whatsapp alinhados à
+        # esquerda — reserva espaço à esquerda do texto para o ícone caber
+        # sem sobrepor, encolhendo a largura disponível para o texto.
+        icon_drawer = _ICON_DRAWERS.get(field_key) if (with_icons and align == "left") else None
+        icon_reserved = 0
+        icon_size = 0
+        if icon_drawer:
+            icon_size = max(10, int(float(cfg.get("font_size", 18)) * 0.82))
+            icon_reserved = icon_size + max(4, int(icon_size * 0.4))
+            max_box_width = max(20, max_box_width - icon_reserved)
+
         font, fitted_text = _fit_text(
             draw, text_value, bool(cfg.get("bold")), max_box_width, float(cfg.get("font_size", 18))
         )
 
-        align = cfg.get("align", "left")
+        text_x = x
         if align in ("center", "right"):
             text_w = draw.textlength(fitted_text, font=font)
             if align == "center":
-                x = int(x - text_w / 2)
+                text_x = int(x - text_w / 2)
             else:
-                x = int(x - text_w)
+                text_x = int(x - text_w)
+        elif icon_drawer:
+            text_x = x + icon_reserved
 
-        color = cfg.get("color") or "#1f2937"
-        draw.text((max(0, x), max(0, y)), fitted_text, font=font, fill=color)
+        if icon_drawer:
+            icon_img = icon_drawer(icon_size, color)
+            icon_y = y + int(icon_size * 0.18)  # aproxima o centro do ícone da altura-x do texto
+            base.alpha_composite(icon_img, dest=(max(0, x), max(0, icon_y)))
+
+        draw.text((max(0, text_x), max(0, y)), fitted_text, font=font, fill=color)
 
     if photo_path and os.path.isfile(photo_path) and defaults["photo"] is not None:
         try:

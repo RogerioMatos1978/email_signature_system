@@ -60,6 +60,25 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v2.0.1?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Correções: número de WhatsApp
+> da planilha agora é reconhecido mesmo com cabeçalhos fora do padrão exato (ex.:
+> "Nº WhatsApp"); e passou a só entrar na assinatura do lote quando o checkbox
+> "Incluir ícones e número de WhatsApp" está marcado (antes entrava sempre que a
+> coluna existia na planilha, ignorando o checkbox).
+>
+> **Atualizando de uma instalação anterior à v2.0.0?** Muda o banco (novas colunas
+> `whatsapp` e `with_icons` em `signature_records`) — é preciso resetar o volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidades: campo "Unidade / Gerência" virou lista suspensa fixa ("UI Rio Verde -
+> Sesi Senai") — na importação em lote, o valor da coluna "Unidade" da planilha passa
+> a ser **ignorado** e substituído automaticamente; checkbox opcional para incluir
+> ícones antes de e-mail/telefone/WhatsApp; novo campo opcional de segundo telefone
+> (WhatsApp).
+>
 > **Atualizando de uma instalação anterior à v1.9.1?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Novidade: o Supervisor agora
 > também pode liberar usuários padrão bloqueados (tela nova "Liberar

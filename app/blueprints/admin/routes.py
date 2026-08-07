@@ -18,7 +18,7 @@ from ...decorators import admin_required, roles_required
 from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm
 from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog
 from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
-from ...utils.template_fields import validate_fields_json, TemplateFieldsError
+from ...utils.template_fields import validate_fields_json, TemplateFieldsError, DEFAULT_UNIT
 from ...utils.image_utils import render_signature, SignatureRenderError
 from ...utils.security import safe_send_file
 from ...utils.flashing import flash_form_errors
@@ -420,6 +420,9 @@ def user_delete(user_id):
 # ---------------------------------------------------------------------------
 
 # Cabeçalhos aceitos (comparação sem acentos/maiúsculas): coluna → campo interno
+# Observação: "unidade"/"gerencia" continuam reconhecidas por compatibilidade
+# com planilhas antigas, mas a partir da v2.0.0 o valor da coluna é IGNORADO —
+# a Unidade / Gerência é sempre fixada em DEFAULT_UNIT (ver loop de geração).
 _SPREADSHEET_COLUMNS = {
     "nome": "full_name",
     "nome completo": "full_name",
@@ -434,11 +437,17 @@ _SPREADSHEET_COLUMNS = {
     "telefone": "phone",
     "fone": "phone",
     "celular": "phone",
+    "whatsapp": "whatsapp",
+    "zap": "whatsapp",
+    "celular whatsapp": "whatsapp",
+    "segundo telefone": "whatsapp",
 }
-_REQUIRED_FIELDS = ("full_name", "role_title", "unit", "signature_email", "phone")
+# "unit" não é mais obrigatório na planilha (é sempre substituído por
+# DEFAULT_UNIT); "whatsapp" sempre foi opcional.
+_REQUIRED_FIELDS = ("full_name", "role_title", "signature_email", "phone")
 _FIELD_LABELS = {
     "full_name": "Nome", "role_title": "Função", "unit": "Unidade",
-    "signature_email": "E-mail", "phone": "Telefone",
+    "signature_email": "E-mail", "phone": "Telefone", "whatsapp": "WhatsApp",
 }
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PHONE_RE = re.compile(r"^[0-9()+\-\s]{8,20}$")
@@ -448,6 +457,40 @@ def _normalize_header(value) -> str:
     text = str(value or "").strip().lower()
     text = unicodedata.normalize("NFKD", text)
     return "".join(ch for ch in text if not unicodedata.combining(ch))
+
+
+# Ordem importa: "whatsapp"/"zap" é verificado ANTES de "telefone"/"celular",
+# porque cabeçalhos como "Telefone WhatsApp" ou "Celular WhatsApp" contêm as
+# duas palavras — sem essa ordem, cairiam em "phone" em vez de "whatsapp".
+_HEADER_CONTAINS_RULES = (
+    ("whatsapp", "whatsapp"),
+    ("zap", "whatsapp"),
+    ("e-mail", "signature_email"),
+    ("email", "signature_email"),
+    ("telefone", "phone"),
+    ("fone", "phone"),
+    ("celular", "phone"),
+    ("funcao", "role_title"),
+    ("cargo", "role_title"),
+    ("nome", "full_name"),
+    ("unidade", "unit"),
+    ("gerencia", "unit"),
+)
+
+
+def _match_field(normalized_header: str):
+    """Casa um cabeçalho de coluna já normalizado (sem acento/maiúsculas) a
+    um campo interno. Primeiro tenta a lista de nomes exatos conhecidos
+    (_SPREADSHEET_COLUMNS); se não achar, tenta por "contém" (ex.: "Nº
+    WhatsApp", "WhatsApp Comercial", "Telefone WhatsApp" — variações de
+    cabeçalho que a lista exata não previa)."""
+    field = _SPREADSHEET_COLUMNS.get(normalized_header)
+    if field:
+        return field
+    for needle, mapped_field in _HEADER_CONTAINS_RULES:
+        if needle in normalized_header:
+            return mapped_field
+    return None
 
 
 def _slugify_filename(name: str) -> str:
@@ -493,7 +536,7 @@ def _map_columns(header_row):
     """Mapeia índice de coluna → campo interno a partir do cabeçalho."""
     mapping = {}
     for idx, cell in enumerate(header_row):
-        field = _SPREADSHEET_COLUMNS.get(_normalize_header(cell))
+        field = _match_field(_normalize_header(cell))
         if field and field not in mapping.values():
             mapping[idx] = field
     missing = [f for f in _REQUIRED_FIELDS if f not in mapping.values()]
@@ -501,7 +544,8 @@ def _map_columns(header_row):
         raise ValueError(
             "Colunas obrigatórias não encontradas na planilha: "
             + ", ".join(_FIELD_LABELS[f] for f in missing)
-            + ". Use o cabeçalho: Nome; Função; Unidade; E-mail; Telefone."
+            + ". Use o cabeçalho: Nome; Função; E-mail; Telefone "
+            + "(Unidade é preenchida automaticamente; WhatsApp é opcional)."
         )
     return mapping
 
@@ -564,7 +608,7 @@ def batch_import():
     def _render(**extra):
         return render_template(
             "admin/batch_import.html", form=form, errors=errors, zip_name=None, generated=0,
-            template=template, **extra
+            template=template, unit_label=DEFAULT_UNIT, **extra
         )
 
     if not template:
@@ -584,6 +628,7 @@ def batch_import():
             return _render()
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
+        with_icons = bool(form.with_icons.data)
         background_path = os.path.join(
             current_app.config["TEMPLATES_UPLOAD_DIR"], template.background_filename
         )
@@ -612,6 +657,15 @@ def batch_import():
             for line_no, row in enumerate(data_rows, start=2):  # linha 1 = cabeçalho
                 values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
                           for idx, field in mapping.items()}
+                # Unidade / Gerência sempre fixa (v2.0.0) — o que estiver na
+                # planilha (se houver essa coluna) é descartado.
+                values["unit"] = DEFAULT_UNIT
+                values.setdefault("whatsapp", "")
+                # O número de WhatsApp da planilha só é usado quando "Incluir
+                # ícones" está marcado (aplica ao lote inteiro) — se
+                # desmarcado, o número é ignorado mesmo que exista na coluna.
+                if not with_icons:
+                    values["whatsapp"] = ""
 
                 row_errors = [
                     _FIELD_LABELS[f] for f in _REQUIRED_FIELDS if not (values.get(f) or "").strip()
@@ -624,6 +678,9 @@ def batch_import():
                     continue
                 if not _PHONE_RE.match(values["phone"]):
                     errors.append(f"Linha {line_no}: telefone inválido ({values['phone']}).")
+                    continue
+                if values["whatsapp"].strip() and not _PHONE_RE.match(values["whatsapp"]):
+                    errors.append(f"Linha {line_no}: WhatsApp inválido ({values['whatsapp']}).")
                     continue
 
                 output_filename = generate_safe_filename(output_format)
@@ -639,6 +696,7 @@ def batch_import():
                         max_width=current_app.config["OUTPUT_MAX_WIDTH"],
                         jpeg_quality=current_app.config["JPEG_QUALITY"],
                         variant="sem_foto",
+                        with_icons=with_icons,
                     )
                 except SignatureRenderError as exc:
                     errors.append(f"Linha {line_no}: {exc}")
@@ -652,6 +710,8 @@ def batch_import():
                     unit=values["unit"][:120],
                     signature_email=values["signature_email"][:190],
                     phone=values["phone"][:40],
+                    whatsapp=(values["whatsapp"][:40] or None),
+                    with_icons=with_icons,
                     output_filename=output_filename,
                     output_format=output_format,
                     status="success",
@@ -686,7 +746,7 @@ def batch_import():
             flash(f"{generated} assinatura(s) gerada(s) com sucesso.", "success")
         return render_template(
             "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=errors,
-            zip_name=zip_name, generated=generated, template=template,
+            zip_name=zip_name, generated=generated, template=template, unit_label=DEFAULT_UNIT,
         )
 
     if form.is_submitted():

@@ -2,6 +2,25 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.0.1] — 2026-08-07
+
+### Corrigido
+- **Número de WhatsApp da planilha não estava sendo reconhecido** em cabeçalhos fora da lista exata prevista (ex.: "Nº WhatsApp", "WhatsApp Comercial", "Telefone WhatsApp"). A detecção da coluna agora também aceita correspondência por "contém a palavra" (whatsapp/zap), com prioridade sobre "telefone"/"celular" — cabeçalhos que citam as duas coisas juntas (ex.: "Telefone WhatsApp") agora vão para o campo WhatsApp, não para Telefone.
+
+### Alterado (comportamento)
+- **Na importação em lote, o número de WhatsApp da planilha só é usado quando o checkbox "Incluir ícones e número de WhatsApp" está marcado.** Desmarcado, o número é ignorado mesmo que a coluna exista na planilha — antes ele sempre entrava na assinatura se a coluna existisse, independente do checkbox.
+
+## [2.0.0] — 2026-08-07
+
+### Alterado (mudança de banco e de comportamento)
+- **Campo "Unidade / Gerência" deixou de ser texto livre e virou uma lista suspensa** com uma única opção hoje: "UI Rio Verde - Sesi Senai". Vale tanto para a geração individual ("Gerar assinatura") quanto para a importação em lote — **se a planilha tiver uma coluna "Unidade"/"Gerência", o valor dela é ignorado e substituído** pela opção fixa. A coluna "Unidade" também deixou de ser obrigatória na planilha (planilhas antigas continuam funcionando normalmente, só que o valor da coluna não é mais usado).
+- `signature_records` ganhou as colunas `whatsapp` e `with_icons`. Requer reset do volume em instalações existentes: `docker compose down -v && docker compose up -d --build`.
+
+### Adicionado
+- **Ícones opcionais antes do e-mail, telefone e WhatsApp**: novo checkbox "Incluir ícones" na geração individual e na importação em lote (aplica a todo o lote de uma vez). Os ícones (envelope, telefone, balão de mensagem) são desenhados diretamente na imagem — não dependem de nenhuma fonte ter esses símbolos, então funcionam com qualquer texto/acentuação.
+- **Segundo telefone (WhatsApp) opcional**: novo campo na geração individual (e coluna opcional "WhatsApp"/"Zap"/"Segundo telefone" reconhecida na importação em lote), exibido logo abaixo do Telefone só quando preenchido. Aparece na confirmação e na Auditoria.
+- Editor de modelo (Admin → Modelos) e pré-visualização da importação em lote ganharam o marcador/painel "WhatsApp", para reposicionar esse campo como qualquer outro.
+
 ## [1.9.1] — 2026-08-06
 
 ### Adicionado

@@ -175,7 +175,9 @@ def new_signature():
             "unit": sanitize_plain_text(form.unit.data, 60),
             "signature_email": sanitize_plain_text(form.signature_email.data, 190),
             "phone": sanitize_plain_text(form.phone.data, 40),
+            "whatsapp": sanitize_plain_text(form.whatsapp.data, 40) if form.whatsapp.data else "",
         }
+        with_icons = bool(form.with_icons.data)
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
         output_filename = generate_safe_filename(output_format)
@@ -198,6 +200,7 @@ def new_signature():
                 max_width=current_app.config["OUTPUT_MAX_WIDTH"],
                 jpeg_quality=current_app.config["JPEG_QUALITY"],
                 variant=variant,
+                with_icons=with_icons,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")
@@ -211,6 +214,8 @@ def new_signature():
             unit=values["unit"],
             signature_email=values["signature_email"],
             phone=values["phone"],
+            whatsapp=values["whatsapp"] or None,
+            with_icons=with_icons,
             photo_filename=photo_filename,
             output_filename=output_filename,
             output_format=output_format,

@@ -21,7 +21,7 @@
 {% if pagination.items %}
 <div class="table-wrap">
   <table class="table">
-    <thead><tr><th>Data</th><th>Usuário</th><th>Nome na assinatura</th><th>Função</th><th>Unidade</th><th>E-mail</th><th>Telefone</th><th>Foto</th><th>Formato</th><th>Portal público</th><th></th></tr></thead>
+    <thead><tr><th>Data</th><th>Usuário</th><th>Nome na assinatura</th><th>Função</th><th>Unidade</th><th>E-mail</th><th>Telefone</th><th>WhatsApp</th><th>Ícones</th><th>Foto</th><th>Formato</th><th>Portal público</th><th></th></tr></thead>
     <tbody>
       {% for r in pagination.items %}
       <tr>
@@ -32,6 +32,8 @@
         <td>{{ r.unit }}</td>
         <td>{{ r.signature_email }}</td>
         <td>{{ r.phone }}</td>
+        <td>{{ r.whatsapp or "—" }}</td>
+        <td>{{ "Sim" if r.with_icons else "Não" }}</td>
         <td>{{ "Sim" if r.photo_filename else "Não" }}</td>
         <td>{{ r.output_format | upper }}</td>
         <td>{% if r.public_downloaded_at %}<span class="badge badge--muted">Baixada {{ r.public_downloaded_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="badge">Disponível</span>{% endif %}</td>

@@ -18,6 +18,8 @@ from wtforms.validators import (
     ValidationError,
 )
 
+from .utils.template_fields import UNIT_CHOICES
+
 PHONE_REGEX = r"^[0-9()+\-\s]{8,20}$"
 USERNAME_REGEX = r"^[A-Za-z0-9_.\-]{3,80}$"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -150,14 +152,19 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="Telefone inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
-    unit = StringField(
-        "Unidade / Gerência",
+    whatsapp = StringField(
+        "WhatsApp (opcional)",
         validators=[
-            DataRequired(message="Informe a unidade ou gerência."),
-            Length(min=2, max=60, message="A unidade deve ter entre 2 e 60 caracteres."),
-            no_control_chars,
+            Optional(),
+            Regexp(PHONE_REGEX, message="WhatsApp inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
+    unit = SelectField(
+        "Unidade / Gerência",
+        choices=UNIT_CHOICES,
+        validators=[DataRequired(message="Selecione a unidade / gerência.")],
+    )
+    with_icons = BooleanField("Incluir ícones antes do e-mail, telefone e WhatsApp", default=False)
     with_photo = BooleanField("Gerar assinatura com foto", default=False)
     photo = FileField(
         "Foto do colaborador",
@@ -193,6 +200,10 @@ class BatchImportForm(FlaskForm):
         choices=[("png", "PNG (recomendado)"), ("jpg", "JPG")],
         default="png",
         validators=[DataRequired()],
+    )
+    with_icons = BooleanField(
+        "Incluir ícones e número de WhatsApp (aplica a todo o lote)",
+        default=False,
     )
     # Posições/estilos opcionais definidos na pré-visualização (arrastar os
     # campos sobre um exemplo antes de importar). Se vazio, usa a posição

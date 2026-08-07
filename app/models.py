@@ -100,6 +100,23 @@ class SignatureTemplate(db.Model):
     def set_fields(self, data: dict) -> None:
         self.fields_json = json.dumps(data or {})
 
+    def get_merged_fields(self) -> dict:
+        """Como get_fields(), mas preenche com o padrão da variante qualquer
+        campo ausente do JSON salvo — útil quando um campo novo é adicionado
+        ao sistema depois que este modelo já foi salvo (ex.: "whatsapp" na
+        v2.0.0). Usado nas pré-visualizações em JavaScript (preview.js /
+        batch_preview.js), que não fazem esse merge sozinhas; o render final
+        do servidor (render_signature) já faz esse merge por conta própria."""
+        from .utils.template_fields import DEFAULTS_BY_VARIANT, normalize_variant
+
+        variant = normalize_variant(self.variant)
+        defaults = DEFAULTS_BY_VARIANT[variant]
+        saved = self.get_fields()
+        merged = {key: {**cfg, **(saved.get(key) or {})} for key, cfg in defaults["text"].items()}
+        if defaults["photo"] is not None:
+            merged["photo"] = {**defaults["photo"], **(saved.get("photo") or {})}
+        return merged
+
     def __repr__(self):
         return f"<SignatureTemplate {self.name!r} active={self.is_active}>"
 
@@ -118,6 +135,8 @@ class SignatureRecord(db.Model):
     unit = db.Column(db.String(120), nullable=False, default="")  # Unidade/Gerência (padrão 2026)
     signature_email = db.Column(db.String(190), nullable=False)
     phone = db.Column(db.String(40), nullable=False)
+    whatsapp = db.Column(db.String(40), nullable=True)  # segundo telefone (WhatsApp), opcional
+    with_icons = db.Column(db.Boolean, nullable=False, default=False)  # ícones antes de e-mail/telefone/whatsapp
 
     photo_filename = db.Column(db.String(255), nullable=True)  # foto do colaborador (variante com_foto)
     output_filename = db.Column(db.String(255), nullable=False)
