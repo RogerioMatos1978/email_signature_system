@@ -60,6 +60,19 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v2.2.0?** Muda o banco (novas
+> colunas `source` e `public_download_count` em `signature_records`) — é
+> preciso resetar o volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidade: assinaturas geradas por importação de planilha deixam de ter a
+> trava de "peça ao Supervisor/Administrador" no portal público — agora podem
+> ser baixadas até 4 vezes, e o registro é apagado automaticamente ao atingir
+> o limite (basta reimportar quando precisar de novo). Assinaturas geradas
+> individualmente continuam com a trava de download único de sempre.
+>
 > **Atualizando de uma instalação anterior à v2.1.0?** Muda o banco (nova
 > tabela `import_jobs`) — é preciso resetar o volume uma vez:
 > ```bash

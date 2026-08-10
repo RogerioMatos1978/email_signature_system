@@ -36,7 +36,15 @@
         <td>{{ "Sim" if r.with_icons else "Não" }}</td>
         <td>{{ "Sim" if r.photo_filename else "Não" }}</td>
         <td>{{ r.output_format | upper }}</td>
-        <td>{% if r.public_downloaded_at %}<span class="badge badge--muted">Baixada {{ r.public_downloaded_at.strftime('%d/%m/%Y') }}</span>{% else %}<span class="badge">Disponível</span>{% endif %}</td>
+        <td>
+          {% if r.source == "batch" %}
+            <span class="badge {{ 'badge--muted' if not r.is_publicly_available else '' }}">{{ r.public_download_count }}/{{ r.PUBLIC_BATCH_DOWNLOAD_LIMIT }} downloads (lote)</span>
+          {% elif r.public_downloaded_at %}
+            <span class="badge badge--muted">Baixada {{ r.public_downloaded_at.strftime('%d/%m/%Y') }}</span>
+          {% else %}
+            <span class="badge">Disponível</span>
+          {% endif %}
+        </td>
         <td><a href="{{ url_for('admin.audit_download', record_id=r.id) }}" class="btn btn--small btn--secondary">Baixar</a></td>
       </tr>
       {% endfor %}

@@ -8,13 +8,18 @@
     <strong>{{ record.full_name }}</strong>
     <span class="muted">— {{ record.role_title }}{% if record.unit %} · {{ record.unit }}{% endif %}</span>
   </div>
-  {% if record.public_downloaded_at %}
-    <span class="badge badge--muted">Já baixada em {{ record.public_downloaded_at.strftime('%d/%m/%Y') }} — solicite ao Supervisor/Administrador</span>
+  {% if record.is_publicly_available %}
+    <div class="public-search__action">
+      <form method="post" action="{{ url_for('main.public_download', record_id=record.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn--secondary btn--small">{{ icons.download("icon") }}<span>Baixar assinatura</span></button>
+      </form>
+      {% if record.public_downloads_remaining is not none %}
+      <span class="muted public-search__remaining">Restam {{ record.public_downloads_remaining }} download(s)</span>
+      {% endif %}
+    </div>
   {% else %}
-    <form method="post" action="{{ url_for('main.public_download', record_id=record.id) }}">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <button type="submit" class="btn btn--secondary btn--small">{{ icons.download("icon") }}<span>Baixar assinatura</span></button>
-    </form>
+    <span class="badge badge--muted">Já baixada em {{ record.public_downloaded_at.strftime('%d/%m/%Y') }} — solicite ao Supervisor/Administrador</span>
   {% endif %}
 </li>
 {% endmacro %}
@@ -45,8 +50,8 @@
     {% if matches|length == 0 %}
       <p class="muted mt-1">Nenhuma assinatura encontrada para "{{ query_name }}". Confira a digitação do nome ou peça ao Supervisor/Administrador para verificar se ela já foi gerada.</p>
     {% else %}
-      {% set available = matches | rejectattr('public_downloaded_at') | list %}
-      {% set downloaded = matches | selectattr('public_downloaded_at') | sort(attribute='public_downloaded_at', reverse=True) | list %}
+      {% set available = matches | selectattr('is_publicly_available') | list %}
+      {% set downloaded = matches | rejectattr('is_publicly_available') | sort(attribute='public_downloaded_at', reverse=True) | list %}
 
       {% if available %}
       <ul class="public-search__results mt-1">
@@ -68,7 +73,7 @@
       {% endif %}
       {% endif %}
 
-      <p class="field__help mt-05">Depois de baixada, a assinatura não fica mais disponível aqui — guarde bem o arquivo. Se precisar de novo, peça ao Supervisor ou Administrador para reenviar por WhatsApp.</p>
+      <p class="field__help mt-05">Assinatura gerada individualmente: pode ser baixada só uma vez por aqui — guarde bem o arquivo; se precisar de novo, peça ao Supervisor ou Administrador para reenviar por WhatsApp. Assinatura gerada por importação de planilha: pode ser baixada algumas vezes seguidas (contador exibido ao lado do botão); depois de esgotar os downloads, é preciso pedir para reimportar a planilha.</p>
     {% endif %}
   {% endif %}
 </div>

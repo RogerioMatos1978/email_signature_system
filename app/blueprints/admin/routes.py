@@ -674,6 +674,7 @@ def _run_batch_import_job(app, job_id, user_id, data_rows, mapping, output_forma
                                 phone=values["phone"][:40],
                                 whatsapp=(values["whatsapp"][:40] or None),
                                 with_icons=with_icons,
+                                source="batch",
                                 output_filename=output_filename,
                                 output_format=output_format,
                                 status="success",

@@ -216,6 +216,7 @@ def new_signature():
             phone=values["phone"],
             whatsapp=values["whatsapp"] or None,
             with_icons=with_icons,
+            source="individual",
             photo_filename=photo_filename,
             output_filename=output_filename,
             output_format=output_format,

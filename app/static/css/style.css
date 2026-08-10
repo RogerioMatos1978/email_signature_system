@@ -437,6 +437,8 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
   background: var(--bg);
 }
 .public-search__result form { margin: 0; }
+.public-search__action { display: flex; flex-direction: column; align-items: flex-end; gap: .3rem; }
+.public-search__remaining { font-size: .78rem; }
 
 .public-search__more { margin-top: .6rem; }
 .public-search__more summary {

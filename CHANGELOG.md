@@ -2,6 +2,13 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.2.0] — 2026-08-10
+
+### Alterado (mudança de banco e de comportamento)
+- **Portal público: assinaturas geradas por importação de planilha não têm mais a trava de "peça ao Supervisor/Administrador" após 1 download.** Como esses colaboradores tipicamente não têm conta de usuário cadastrada no sistema, a trava de download único (pensada para o autoatendimento do usuário padrão) não fazia sentido para eles. Agora: uma assinatura gerada em lote pode ser baixada pelo portal público **até 4 vezes**; ao atingir o limite, o registro é **apagado automaticamente** — não é mais preciso pedir para ninguém reenviar, basta reimportar a planilha (ou gerar de novo individualmente) quando precisar. Assinaturas geradas individualmente (autoatendimento do usuário padrão, ou Admin/Supervisor gerando para alguém específico) continuam com a trava de download único de sempre.
+- A busca pública agora mostra "Restam N download(s)" ao lado do botão de baixar, para as assinaturas de lote.
+- `signature_records` ganhou as colunas `source` ("individual"/"batch") e `public_download_count`. Requer reset do volume em instalações existentes: `docker compose down -v && docker compose up -d --build`.
+
 ## [2.1.0] — 2026-08-10
 
 ### Adicionado
