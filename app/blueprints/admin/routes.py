@@ -5,10 +5,12 @@ import os
 import re
 import secrets
 import string
+import threading
 import unicodedata
 import zipfile
+from datetime import datetime, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from PIL import ImageOps
@@ -16,7 +18,7 @@ from PIL import ImageOps
 from ...extensions import db
 from ...decorators import admin_required, roles_required
 from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm
-from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog
+from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog, ImportJob
 from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
 from ...utils.template_fields import validate_fields_json, TemplateFieldsError, DEFAULT_UNIT
 from ...utils.image_utils import render_signature, SignatureRenderError
@@ -594,11 +596,147 @@ def batch_import_save_positions():
     return redirect(url_for("admin.batch_import"))
 
 
+def _cleanup_stale_import_jobs() -> None:
+    """Remove jobs de importação com mais de 24h (concluídos ou não) — só
+    guardam contadores e mensagens de erro, sem valor depois que a tela de
+    progresso já foi vista, então não há razão para acumular para sempre."""
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    ImportJob.query.filter(ImportJob.created_at < cutoff).delete(synchronize_session=False)
+    db.session.commit()
+
+
+def _run_batch_import_job(app, job_id, user_id, data_rows, mapping, output_format, with_icons, fields_config, background_path, template_id):
+    """Gera as assinaturas do lote em segundo plano (chamado numa thread à
+    parte, fora do ciclo de requisição HTTP) — atualiza o ImportJob no banco
+    a cada linha processada, para a barra de progresso (tela de importação)
+    poder consultar via polling em /admin/importar/progresso/<job_id>."""
+    with app.app_context():
+        job = ImportJob.query.get(job_id)
+        if not job:
+            return
+        try:
+            zip_buffer = io.BytesIO()
+            generated = 0
+            errors = []
+            used_names = set()
+            total = len(data_rows)
+
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                for i, (line_no, row) in enumerate(enumerate(data_rows, start=2), start=1):  # linha 1 = cabeçalho
+                    values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
+                              for idx, field in mapping.items()}
+                    # Unidade / Gerência sempre fixa (v2.0.0) — o que estiver
+                    # na planilha (se houver essa coluna) é descartado.
+                    values["unit"] = DEFAULT_UNIT
+                    values.setdefault("whatsapp", "")
+                    # O número de WhatsApp da planilha só é usado quando
+                    # "Incluir ícones" está marcado (aplica ao lote inteiro).
+                    if not with_icons:
+                        values["whatsapp"] = ""
+
+                    row_errors = [
+                        _FIELD_LABELS[f] for f in _REQUIRED_FIELDS if not (values.get(f) or "").strip()
+                    ]
+                    if row_errors:
+                        errors.append(f"Linha {line_no}: campo(s) vazio(s): {', '.join(row_errors)}.")
+                    elif not _EMAIL_RE.match(values["signature_email"]):
+                        errors.append(f"Linha {line_no}: e-mail inválido ({values['signature_email']}).")
+                    elif not _PHONE_RE.match(values["phone"]):
+                        errors.append(f"Linha {line_no}: telefone inválido ({values['phone']}).")
+                    elif values["whatsapp"].strip() and not _PHONE_RE.match(values["whatsapp"]):
+                        errors.append(f"Linha {line_no}: WhatsApp inválido ({values['whatsapp']}).")
+                    else:
+                        output_filename = generate_safe_filename(output_format)
+                        output_path = os.path.join(app.config["GENERATED_UPLOAD_DIR"], output_filename)
+                        try:
+                            render_signature(
+                                background_path=background_path,
+                                fields_config=fields_config,
+                                values=values,
+                                photo_path=None,
+                                output_path=output_path,
+                                output_format=output_format,
+                                max_width=app.config["OUTPUT_MAX_WIDTH"],
+                                jpeg_quality=app.config["JPEG_QUALITY"],
+                                variant="sem_foto",
+                                with_icons=with_icons,
+                            )
+                        except SignatureRenderError as exc:
+                            errors.append(f"Linha {line_no}: {exc}")
+                        else:
+                            record = SignatureRecord(
+                                user_id=user_id,
+                                template_id=template_id,
+                                full_name=values["full_name"][:120],
+                                role_title=values["role_title"][:120],
+                                unit=values["unit"][:120],
+                                signature_email=values["signature_email"][:190],
+                                phone=values["phone"][:40],
+                                whatsapp=(values["whatsapp"][:40] or None),
+                                with_icons=with_icons,
+                                output_filename=output_filename,
+                                output_format=output_format,
+                                status="success",
+                            )
+                            db.session.add(record)
+
+                            arc = f"assinatura-{_slugify_filename(values['full_name'])}"
+                            n, base_arc = 2, arc
+                            while arc in used_names:
+                                arc = f"{base_arc}-{n}"
+                                n += 1
+                            used_names.add(arc)
+                            zf.write(output_path, f"{arc}.{output_format}")
+                            generated += 1
+
+                    # Grava o progresso a cada 5 linhas (e sempre na última) —
+                    # atualizar a cada linha geraria escritas demais no
+                    # SQLite; a cada 5 já dá uma barra fluida o suficiente.
+                    job.processed = i
+                    job.generated = generated
+                    job.set_errors(errors)
+                    if i % 5 == 0 or i == total:
+                        db.session.commit()
+
+            if generated == 0:
+                job.status = "error"
+                job.error_message = "Nenhuma assinatura foi gerada. Corrija os erros da planilha e tente novamente."
+                db.session.commit()
+                return
+
+            zip_name = f"{secrets.token_hex(16)}.zip"
+            zip_path = os.path.join(app.config["GENERATED_UPLOAD_DIR"], zip_name)
+            with open(zip_path, "wb") as fh:
+                fh.write(zip_buffer.getvalue())
+
+            job.status = "done"
+            job.zip_name = zip_name
+            job.generated = generated
+            job.processed = total
+            job.set_errors(errors)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 — job em segundo plano: qualquer falha precisa virar status "error", nunca travar em silêncio
+            db.session.rollback()
+            app.logger.exception("Falha no job de importação em lote %s", job_id)
+            job = ImportJob.query.get(job_id)
+            if job:
+                job.status = "error"
+                job.error_message = f"Falha inesperada ao gerar o lote: {exc}"
+                db.session.commit()
+
+
 @admin_bp.route("/importar", methods=["GET", "POST"])
 @supervisor_or_admin_required
 def batch_import():
     form = BatchImportForm()
     errors = []
+    # "fetch" = a página tem JavaScript e vai mostrar a barra de progresso via
+    # polling; sem esse cabeçalho (JS desabilitado ou formulário enviado do
+    # jeito clássico), o comportamento cai para o mesmo fluxo síncrono de
+    # sempre — a requisição só termina quando o lote inteiro estiver pronto.
+    wants_json = request.headers.get("X-Requested-With") == "fetch"
+
+    _cleanup_stale_import_jobs()
 
     # Modelo SEM FOTO ativo — usado tanto para a pré-visualização/reposicionamento
     # (GET) quanto para a geração em lote (POST). Sem ele, nem a prévia nem a
@@ -606,26 +744,31 @@ def batch_import():
     template = SignatureTemplate.query.filter_by(is_active=True, variant="sem_foto").first()
 
     def _render(**extra):
+        extra.setdefault("errors", errors)
+        extra.setdefault("zip_name", None)
+        extra.setdefault("generated", 0)
         return render_template(
-            "admin/batch_import.html", form=form, errors=errors, zip_name=None, generated=0,
-            template=template, unit_label=DEFAULT_UNIT, **extra
+            "admin/batch_import.html", form=form, template=template, unit_label=DEFAULT_UNIT, **extra
         )
 
-    if not template:
-        flash("Nenhum modelo ativo da variante SEM FOTO. Ative um em Admin → Modelos antes de importar.", "error")
+    def _fail(message):
+        if wants_json:
+            return jsonify(error=message), 400
+        flash(message, "error")
         return _render()
+
+    if not template:
+        return _fail("Nenhum modelo ativo da variante SEM FOTO. Ative um em Admin → Modelos antes de importar.")
 
     if form.validate_on_submit():
         try:
             header, data_rows = _read_spreadsheet_rows(form.spreadsheet.data)
             mapping = _map_columns(header)
         except ValueError as exc:
-            flash(str(exc), "error")
-            return _render()
+            return _fail(str(exc))
 
         if len(data_rows) > 500:
-            flash("A planilha tem mais de 500 linhas. Divida em arquivos menores.", "error")
-            return _render()
+            return _fail("A planilha tem mais de 500 linhas. Divida em arquivos menores.")
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
         with_icons = bool(form.with_icons.data)
@@ -643,115 +786,97 @@ def batch_import():
             try:
                 fields_config = validate_fields_json(form.fields_json.data, "sem_foto")
             except TemplateFieldsError as exc:
-                flash(str(exc), "error")
-                return _render()
+                return _fail(str(exc))
             _save_positions_if_changed(template, fields_config)
         else:
             fields_config = template.get_fields()
 
-        zip_buffer = io.BytesIO()
-        generated = 0
-        used_names = set()
-
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for line_no, row in enumerate(data_rows, start=2):  # linha 1 = cabeçalho
-                values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
-                          for idx, field in mapping.items()}
-                # Unidade / Gerência sempre fixa (v2.0.0) — o que estiver na
-                # planilha (se houver essa coluna) é descartado.
-                values["unit"] = DEFAULT_UNIT
-                values.setdefault("whatsapp", "")
-                # O número de WhatsApp da planilha só é usado quando "Incluir
-                # ícones" está marcado (aplica ao lote inteiro) — se
-                # desmarcado, o número é ignorado mesmo que exista na coluna.
-                if not with_icons:
-                    values["whatsapp"] = ""
-
-                row_errors = [
-                    _FIELD_LABELS[f] for f in _REQUIRED_FIELDS if not (values.get(f) or "").strip()
-                ]
-                if row_errors:
-                    errors.append(f"Linha {line_no}: campo(s) vazio(s): {', '.join(row_errors)}.")
-                    continue
-                if not _EMAIL_RE.match(values["signature_email"]):
-                    errors.append(f"Linha {line_no}: e-mail inválido ({values['signature_email']}).")
-                    continue
-                if not _PHONE_RE.match(values["phone"]):
-                    errors.append(f"Linha {line_no}: telefone inválido ({values['phone']}).")
-                    continue
-                if values["whatsapp"].strip() and not _PHONE_RE.match(values["whatsapp"]):
-                    errors.append(f"Linha {line_no}: WhatsApp inválido ({values['whatsapp']}).")
-                    continue
-
-                output_filename = generate_safe_filename(output_format)
-                output_path = os.path.join(current_app.config["GENERATED_UPLOAD_DIR"], output_filename)
-                try:
-                    render_signature(
-                        background_path=background_path,
-                        fields_config=fields_config,
-                        values=values,
-                        photo_path=None,
-                        output_path=output_path,
-                        output_format=output_format,
-                        max_width=current_app.config["OUTPUT_MAX_WIDTH"],
-                        jpeg_quality=current_app.config["JPEG_QUALITY"],
-                        variant="sem_foto",
-                        with_icons=with_icons,
-                    )
-                except SignatureRenderError as exc:
-                    errors.append(f"Linha {line_no}: {exc}")
-                    continue
-
-                record = SignatureRecord(
-                    user_id=current_user.id,
-                    template_id=template.id,
-                    full_name=values["full_name"][:120],
-                    role_title=values["role_title"][:120],
-                    unit=values["unit"][:120],
-                    signature_email=values["signature_email"][:190],
-                    phone=values["phone"][:40],
-                    whatsapp=(values["whatsapp"][:40] or None),
-                    with_icons=with_icons,
-                    output_filename=output_filename,
-                    output_format=output_format,
-                    status="success",
-                )
-                db.session.add(record)
-
-                arc = f"assinatura-{_slugify_filename(values['full_name'])}"
-                n, base_arc = 2, arc
-                while arc in used_names:
-                    arc = f"{base_arc}-{n}"
-                    n += 1
-                used_names.add(arc)
-                zf.write(output_path, f"{arc}.{output_format}")
-                generated += 1
-
+        job = ImportJob(id=secrets.token_hex(16), user_id=current_user.id, status="running", total=len(data_rows))
+        db.session.add(job)
         db.session.commit()
 
-        if generated == 0:
-            flash("Nenhuma assinatura foi gerada. Corrija os erros da planilha e tente novamente.", "error")
-            return _render()
+        app_obj = current_app._get_current_object()
+        thread = threading.Thread(
+            target=_run_batch_import_job,
+            args=(app_obj, job.id, current_user.id, data_rows, mapping, output_format, with_icons, fields_config, background_path, template.id),
+            daemon=True,
+        )
+        thread.start()
 
-        # Salva o ZIP em disco e mostra a página de resultado com o link de
-        # download + a lista de linhas ignoradas (se houver).
-        zip_name = f"{secrets.token_hex(16)}.zip"
-        zip_path = os.path.join(current_app.config["GENERATED_UPLOAD_DIR"], zip_name)
-        with open(zip_path, "wb") as fh:
-            fh.write(zip_buffer.getvalue())
+        if wants_json:
+            return jsonify(job_id=job.id, total=job.total)
 
-        if errors:
-            flash(f"{generated} assinatura(s) gerada(s); {len(errors)} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
+        # Sem JavaScript: espera o job terminar (do jeito de sempre, a
+        # requisição só volta quando o lote inteiro estiver pronto) e mostra
+        # o resultado direto — ninguém fica sem resposta por falta de JS.
+        thread.join()
+        db.session.refresh(job)
+        if job.status == "error":
+            flash(job.error_message or "Falha ao gerar o lote.", "error")
+            return _render(errors=job.get_errors())
+        if job.get_errors():
+            flash(f"{job.generated} assinatura(s) gerada(s); {len(job.get_errors())} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
         else:
-            flash(f"{generated} assinatura(s) gerada(s) com sucesso.", "success")
+            flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
         return render_template(
-            "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=errors,
-            zip_name=zip_name, generated=generated, template=template, unit_label=DEFAULT_UNIT,
+            "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
+            zip_name=job.zip_name, generated=job.generated, template=template, unit_label=DEFAULT_UNIT,
         )
 
     if form.is_submitted():
+        if wants_json:
+            return jsonify(error="Formulário inválido. Confira os campos e tente novamente."), 400
         flash_form_errors(form)
     return _render()
+
+
+@admin_bp.route("/importar/progresso/<job_id>")
+@supervisor_or_admin_required
+def batch_import_progress(job_id):
+    """Consultado via JavaScript (polling) pela barra de progresso — só o
+    dono do job pode consultar (nada sensível além de contadores, mas não há
+    razão para um Supervisor ver o progresso do lote de outro)."""
+    job = ImportJob.query.get(job_id)
+    if not job or job.user_id != current_user.id:
+        abort(404)
+    return jsonify(
+        status=job.status,
+        total=job.total,
+        processed=job.processed,
+        generated=job.generated,
+        zip_name=job.zip_name,
+        errors=job.get_errors(),
+        error_message=job.error_message,
+    )
+
+
+@admin_bp.route("/importar/resultado/<job_id>")
+@supervisor_or_admin_required
+def batch_import_result(job_id):
+    """Página de resultado para quem importou via JavaScript (a barra de
+    progresso redireciona para cá assim que o job termina) — mesmo template
+    usado no fluxo síncrono (sem JS), só que lendo os dados do job salvo."""
+    job = ImportJob.query.get(job_id)
+    if not job or job.user_id != current_user.id:
+        abort(404)
+
+    template = SignatureTemplate.query.filter_by(is_active=True, variant="sem_foto").first()
+
+    if job.status == "running":
+        flash("A importação ainda está em andamento. Aguarde a barra de progresso terminar.", "info")
+        return redirect(url_for("admin.batch_import"))
+    if job.status == "error":
+        flash(job.error_message or "Falha ao gerar o lote.", "error")
+        return redirect(url_for("admin.batch_import"))
+
+    if job.get_errors():
+        flash(f"{job.generated} assinatura(s) gerada(s); {len(job.get_errors())} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
+    else:
+        flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
+    return render_template(
+        "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
+        zip_name=job.zip_name, generated=job.generated, template=template, unit_label=DEFAULT_UNIT,
+    )
 
 
 @admin_bp.route("/importar/download/<zip_name>")

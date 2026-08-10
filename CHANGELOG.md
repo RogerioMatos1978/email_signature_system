@@ -2,6 +2,15 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.1.0] — 2026-08-10
+
+### Adicionado
+- **Barra de progresso na importação em lote**: ao clicar em "Importar e gerar assinaturas", a geração roda em segundo plano no servidor e a tela mostra uma barra de progresso em tempo real ("Gerando X de Y assinatura(s)..."), em vez de ficar sem nenhum retorno visual até o lote inteiro terminar. Sem JavaScript, o comportamento cai automaticamente para o mesmo fluxo de sempre (espera o lote todo e mostra o resultado direto).
+- **Terceiro tema do site: "Cor da assinatura"**, além de Branco e Preto — usa a mesma paleta azul da assinatura oficial FIEG (#008BD2) como cor de destaque, com a barra lateral em um degradê azul-marinho → azul, no mesmo espírito visual da própria assinatura gerada. O botão único de alternância virou um seletor de 3 opções (ícones sol / lua / gota).
+
+### Alterado (mudança de banco)
+- Nova tabela `import_jobs`, usada para acompanhar o progresso de cada importação em lote. Requer reset do volume em instalações existentes: `docker compose down -v && docker compose up -d --build`.
+
 ## [2.0.1] — 2026-08-07
 
 ### Corrigido

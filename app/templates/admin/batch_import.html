@@ -30,7 +30,13 @@
         </label>
         <p class="field__help">Se a planilha tiver uma coluna de WhatsApp, o número só entra na assinatura quando esta opção está marcada — desmarcada, o número é ignorado mesmo estando na planilha.</p>
       </div>
-      <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+      <button type="submit" id="batchImportSubmitBtn" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+
+      <div id="importProgress" class="import-progress is-hidden">
+        <div class="import-progress__bar-wrap"><div class="import-progress__bar" id="importProgressBar"></div></div>
+        <p id="importProgressLabel" class="muted import-progress__label">Preparando importação...</p>
+        <p id="importProgressError" class="field__error is-hidden"></p>
+      </div>
     </div>
 
     <div class="card card--tip">
@@ -99,6 +105,17 @@
   "fields": template.get_merged_fields()
 } | tojson }}
 </script>
+
+{# URLs com um placeholder "__ID__" no lugar do job_id — o JS troca pelo id
+   real recebido do servidor ao iniciar a importação. Evita montar caminhos
+   de rota "na unha" em JavaScript. #}
+<script type="application/json" id="batchImportUrls">
+{{ {
+  "start": url_for('admin.batch_import'),
+  "progress": url_for('admin.batch_import_progress', job_id='__ID__'),
+  "result": url_for('admin.batch_import_result', job_id='__ID__')
+} | tojson }}
+</script>
 {% endif %}
 
 {% if zip_name %}
@@ -123,5 +140,6 @@
 {% block extra_scripts %}
 {% if template %}
 <script src="{{ url_for('static', filename='js/batch_preview.js') }}"></script>
+<script src="{{ url_for('static', filename='js/batch_import_progress.js') }}"></script>
 {% endif %}
 {% endblock %}

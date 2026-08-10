@@ -27,6 +27,20 @@
   --shadow: 0 1px 3px rgba(17, 17, 17, 0.06), 0 8px 24px rgba(17, 17, 17, 0.05);
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   color-scheme: light;
+
+  /* Sidebar: por padrão usa as mesmas cores gerais do tema (mesmo visual de
+     sempre) — só o tema "Cor da assinatura" sobrescreve estas variáveis com
+     o degradê azul da própria assinatura. Ter variáveis próprias para a
+     sidebar evita que essa mudança de fundo afete o resto da página. */
+  --sidebar-bg: var(--card-bg);
+  --sidebar-border: var(--border);
+  --sidebar-ink: var(--ink-soft);
+  --sidebar-ink-strong: var(--ink);
+  --sidebar-hover-bg: var(--primary-light);
+  --sidebar-hover-ink: var(--primary-dark);
+  --sidebar-active-bg: var(--primary-light);
+  --sidebar-active-ink: var(--primary-dark);
+  --sidebar-brand-ink: var(--ink);
 }
 
 /* Tema escuro — paleta baseada no GitHub Dark (Primer), um dos temas escuros
@@ -55,6 +69,54 @@
   --checker-b: #21262d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.4);
   color-scheme: dark;
+
+  --sidebar-bg: var(--card-bg);
+  --sidebar-border: var(--border);
+  --sidebar-ink: var(--ink-soft);
+  --sidebar-ink-strong: var(--ink);
+  --sidebar-hover-bg: var(--primary-light);
+  --sidebar-hover-ink: var(--primary-dark);
+  --sidebar-active-bg: var(--primary-light);
+  --sidebar-active-ink: var(--primary-dark);
+  --sidebar-brand-ink: var(--ink);
+}
+
+/* Tema "Cor da assinatura" — usa a mesma paleta azul da assinatura oficial
+   FIEG (#008BD2, ver app/utils/template_fields.py `_AZUL_FIEG`) como cor de
+   marca em vez do roxo genérico, e a sidebar ganha o mesmo degradê azul-
+   marinho → azul da própria assinatura (em vez de reaproveitar --card-bg).
+   O conteúdo principal continua claro, para manter boa legibilidade. */
+[data-theme="signature"] {
+  --primary: #008bd2;
+  --primary-dark: #00618f;
+  --primary-light: #e3f4fc;
+  --accent: #00b894;
+  --danger: #e74c3c;
+  --danger-light: #fdecea;
+  --warning: #f39c12;
+  --success: #027a55;
+  --success-bg: #e6f9f2;
+  --ink: #0f2438;
+  --ink-soft: #3d5876;
+  --muted: #6b84a0;
+  --border: #cfe6f5;
+  --bg: #f2f9fd;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+  --checker-a: #eaf6fd;
+  --checker-b: #ffffff;
+  --shadow: 0 1px 3px rgba(0, 60, 100, 0.08), 0 8px 24px rgba(0, 60, 100, 0.08);
+  color-scheme: light;
+
+  --sidebar-bg: linear-gradient(165deg, #04263f 0%, #00558a 55%, #008bd2 100%);
+  --sidebar-border: rgba(255, 255, 255, 0.16);
+  --sidebar-ink: rgba(255, 255, 255, 0.82);
+  --sidebar-ink-strong: #ffffff;
+  --sidebar-hover-bg: rgba(255, 255, 255, 0.14);
+  --sidebar-hover-ink: #ffffff;
+  --sidebar-active-bg: rgba(255, 255, 255, 0.2);
+  --sidebar-active-ink: #ffffff;
+  --sidebar-brand-ink: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -101,29 +163,37 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
 .back-link:hover { color: var(--primary); }
 .back-link .icon { width: 16px; height: 16px; }
 
-/* ---------------------------------------------------------------- alternador de tema */
-.theme-toggle {
-  width: 36px;
-  height: 36px;
+/* ---------------------------------------------------------------- seletor de tema (3 opções) */
+.theme-switch {
+  display: flex;
+  align-items: center;
+  gap: .2rem;
+  padding: .2rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  flex-shrink: 0;
+}
+.theme-switch__btn {
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 999px;
   color: var(--ink-soft);
   cursor: pointer;
   flex-shrink: 0;
 }
-.theme-toggle:hover { color: var(--primary); border-color: var(--primary); }
-.theme-toggle__icon { display: flex; }
-.theme-toggle__icon--moon { display: none; }
-[data-theme="dark"] .theme-toggle__icon--sun { display: none; }
-[data-theme="dark"] .theme-toggle__icon--moon { display: flex; }
+.theme-switch__btn:hover { color: var(--primary); }
+.theme-switch__btn.is-active { background: var(--primary); color: #fff; }
+.theme-switch__btn .icon { width: 16px; height: 16px; }
 
-/* Nas páginas sem topbar (login, portal público sem login), o botão fica
-   fixo no canto — nas páginas autenticadas ele já mora dentro do menu. */
-.theme-toggle--floating {
+/* Nas páginas sem topbar (login, portal público sem login), o seletor fica
+   fixo no canto — nas páginas autenticadas ele já mora no rodapé do menu. */
+.theme-switch--floating {
   position: fixed;
   top: .85rem;
   right: 1rem;
@@ -131,7 +201,17 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
   background: var(--card-bg);
   box-shadow: var(--shadow);
 }
-.theme-toggle--inline { margin-left: .25rem; }
+
+/* Dentro da sidebar, usa as variáveis próprias dela — no tema "Cor da
+   assinatura" a sidebar fica azul-marinho, então o seletor precisa de cores
+   claras mesmo quando o resto do site usa as cores normais (--ink-soft
+   etc., pensadas para fundo claro, ficariam quase invisíveis ali). */
+.theme-switch--inline {
+  border-color: var(--sidebar-border);
+}
+.theme-switch--inline .theme-switch__btn { color: var(--sidebar-ink); }
+.theme-switch--inline .theme-switch__btn:hover { color: var(--sidebar-hover-ink); }
+.theme-switch--inline .theme-switch__btn.is-active { background: var(--sidebar-active-bg); color: var(--sidebar-active-ink); }
 
 /* Utilitários — usados no lugar de atributos style="" inline, para que a
    página funcione corretamente mesmo com Content-Security-Policy sem
@@ -150,8 +230,8 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
 .sidebar {
   width: 240px;
   flex-shrink: 0;
-  background: var(--card-bg);
-  border-right: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -165,13 +245,13 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
   align-items: center;
   gap: .55rem;
   padding: 1.1rem 1.15rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--sidebar-border);
   font-weight: 800;
   font-size: 1rem;
-  color: var(--ink);
+  color: var(--sidebar-brand-ink);
   line-height: 1.25;
 }
-.brand__icon { color: var(--primary); width: 26px; height: 26px; flex-shrink: 0; }
+.brand__icon { color: var(--sidebar-brand-ink); width: 26px; height: 26px; flex-shrink: 0; }
 
 .sidebar__nav {
   flex: 1;
@@ -182,7 +262,7 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
 }
 .sidebar__footer {
   padding: .75rem;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--sidebar-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -205,13 +285,13 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
   gap: .55rem;
   padding: .6rem .7rem;
   border-radius: var(--radius-sm);
-  color: var(--ink-soft);
+  color: var(--sidebar-ink);
   font-weight: 600;
   font-size: .92rem;
   width: 100%;
 }
-.nav__link:hover { background: var(--primary-light); color: var(--primary-dark); }
-.nav__link.is-active { background: var(--primary-light); color: var(--primary-dark); }
+.nav__link:hover { background: var(--sidebar-hover-bg); color: var(--sidebar-hover-ink); }
+.nav__link.is-active { background: var(--sidebar-active-bg); color: var(--sidebar-active-ink); }
 .nav__link--logout { color: var(--danger); }
 .nav__link--logout:hover { background: var(--danger-light); color: var(--danger); }
 .nav__link span { white-space: nowrap; }
@@ -297,6 +377,24 @@ h2 { font-size: 1.15rem; margin: 0 0 .75rem; font-weight: 700; }
 .field__help { font-size: .8rem; color: var(--muted); margin: .35rem 0 0; }
 .field__error { font-size: .8rem; color: var(--danger); margin: .35rem 0 0; font-weight: 600; }
 .field--error .field__input { border-color: var(--danger); }
+
+/* ---------------------------------------------------------------- barra de progresso (importação em lote) */
+.import-progress { margin-top: 1rem; }
+.import-progress__bar-wrap {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--primary-light);
+  overflow: hidden;
+}
+.import-progress__bar {
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  border-radius: 999px;
+  transition: width .25s ease;
+}
+.import-progress__label { margin-top: .5rem; font-size: .85rem; }
 
 /* ---------------------------------------------------------------- buttons */
 .btn {

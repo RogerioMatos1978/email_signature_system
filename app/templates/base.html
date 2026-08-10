@@ -15,10 +15,11 @@
 <body>
 {% import "_icons.html" as icons %}
 {% macro theme_toggle_btn(cls) %}
-<button type="button" class="theme-toggle {{ cls }}" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
-  <span class="theme-toggle__icon theme-toggle__icon--sun">{{ icons.sun() }}</span>
-  <span class="theme-toggle__icon theme-toggle__icon--moon">{{ icons.moon() }}</span>
-</button>
+<div class="theme-switch {{ cls }}" role="group" aria-label="Tema do site">
+  <button type="button" class="theme-switch__btn" data-theme-choice="light" aria-label="Tema branco" title="Tema branco">{{ icons.sun() }}</button>
+  <button type="button" class="theme-switch__btn" data-theme-choice="dark" aria-label="Tema preto" title="Tema preto">{{ icons.moon() }}</button>
+  <button type="button" class="theme-switch__btn" data-theme-choice="signature" aria-label="Tema cor da assinatura" title="Tema cor da assinatura">{{ icons.droplet() }}</button>
+</div>
 {% endmacro %}
 
 {# O bloco de conteúdo ({% block content %}) só pode aparecer UMA vez no
@@ -60,7 +61,7 @@
 
     <div class="sidebar__footer">
       <a href="{{ url_for('auth.logout') }}" class="nav__link nav__link--logout">{{ icons.logout() }}<span>Sair</span></a>
-      {{ theme_toggle_btn("theme-toggle--inline") }}
+      {{ theme_toggle_btn("theme-switch--inline") }}
     </div>
   </aside>
 
@@ -74,7 +75,7 @@
       </div>
     </header>
 {% else %}
-  {{ theme_toggle_btn("theme-toggle--floating") }}
+  {{ theme_toggle_btn("theme-switch--floating") }}
 {% endif %}
 
     <main class="page">

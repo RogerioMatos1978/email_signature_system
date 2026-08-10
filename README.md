@@ -60,6 +60,17 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v2.1.0?** Muda o banco (nova
+> tabela `import_jobs`) — é preciso resetar o volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidades: barra de progresso ao importar planilha em lote (a geração roda em
+> segundo plano e a tela mostra "Gerando X de Y assinatura(s)..." em tempo
+> real); terceiro tema do site "Cor da assinatura" (paleta azul FIEG), além de
+> Branco e Preto — o botão de tema virou um seletor de 3 opções.
+>
 > **Atualizando de uma instalação anterior à v2.0.1?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Correções: número de WhatsApp
 > da planilha agora é reconhecido mesmo com cabeçalhos fora do padrão exato (ex.:

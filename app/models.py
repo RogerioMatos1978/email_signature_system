@@ -186,3 +186,40 @@ class PublicAccessLog(db.Model):
 
     def __repr__(self):
         return f"<PublicAccessLog action={self.action!r} name={self.searched_name!r}>"
+
+
+class ImportJob(db.Model):
+    """Job de importação em lote rodando em segundo plano (thread), para a
+    barra de progresso da tela de Importar planilha. É persistido no BANCO
+    (não em um dicionário em memória) porque a aplicação roda com múltiplos
+    processos Gunicorn (ver entrypoint.sh, --workers): o processo que recebe
+    a requisição de progresso (polling via JavaScript) pode não ser o mesmo
+    processo que criou o job e está rodando a thread — um dicionário em
+    memória só existiria dentro de UM processo."""
+
+    __tablename__ = "import_jobs"
+
+    id = db.Column(db.String(32), primary_key=True)  # secrets.token_hex(16)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False, default="running", index=True)  # running|done|error
+    total = db.Column(db.Integer, nullable=False, default=0)
+    processed = db.Column(db.Integer, nullable=False, default=0)
+    generated = db.Column(db.Integer, nullable=False, default=0)
+    errors_json = db.Column(db.Text, nullable=False, default="[]")
+    zip_name = db.Column(db.String(255), nullable=True)
+    error_message = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_errors(self) -> list:
+        try:
+            data = json.loads(self.errors_json) if self.errors_json else []
+            return data if isinstance(data, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_errors(self, errors) -> None:
+        self.errors_json = json.dumps(list(errors or []))
+
+    def __repr__(self):
+        return f"<ImportJob {self.id} status={self.status!r} {self.processed}/{self.total}>"
