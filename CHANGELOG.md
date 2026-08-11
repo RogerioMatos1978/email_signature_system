@@ -2,6 +2,14 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.3.0] — 2026-08-11
+
+### Adicionado
+- **Favicon novo**, gerado com as cores oficiais da marca (degradê azul-marinho `#0B4390` → azul FIEG `#008BD2`, envelope branco) — aparece na aba do navegador, nos favoritos e como ícone de atalho em celulares (`apple-touch-icon`). Gerado localmente com Pillow, sem depender de nenhum serviço externo.
+
+### Alterado
+- **Ícones de e-mail, telefone e WhatsApp redesenhados**, na mesma linguagem visual do novo favicon — tanto os ícones do menu/interface (app/templates/_icons.html) quanto os desenhados dentro da própria imagem da assinatura quando "Incluir ícones" está marcado (app/utils/image_utils.py). Destaque: o ícone de telefone deixou de ser uma linha diagonal abstrata e virou uma silhueta de aparelho (retângulo arredondado com alto-falante e botão), bem mais reconhecível.
+
 ## [2.2.0] — 2026-08-10
 
 ### Alterado (mudança de banco e de comportamento)

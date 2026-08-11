@@ -60,6 +60,13 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Atualizando de uma instalação anterior à v2.3.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidades: favicon novo com
+> as cores da marca, e ícones de e-mail/telefone/WhatsApp redesenhados (no
+> menu e dentro da própria imagem da assinatura, quando "Incluir ícones" está
+> marcado) — o ícone de telefone agora é uma silhueta de aparelho, bem mais
+> reconhecível.
+>
 > **Atualizando de uma instalação anterior à v2.2.0?** Muda o banco (novas
 > colunas `source` e `public_download_count` em `signature_records`) — é
 > preciso resetar o volume uma vez:

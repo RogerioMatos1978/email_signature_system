@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Assinaturas de E-mail{% endblock %} · Sistema de Assinaturas de E-mail</title>
 <meta name="csrf-token" content="{{ csrf_token() }}">
+{# Favicon gerado localmente (PIL, sem depender de serviço externo) com as
+   cores oficiais da marca: azul-marinho #0B4390 -> azul FIEG #008BD2, com um
+   envelope branco — os mesmos ícones de e-mail/telefone/WhatsApp usados no
+   sistema (menu e assinatura gerada) seguem essa mesma linguagem visual. #}
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 {# Síncrono de propósito (sem defer/async): precisa rodar ANTES do <body>
    pintar, para não haver flash de tema claro em quem já escolheu escuro.

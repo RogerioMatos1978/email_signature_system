@@ -97,7 +97,10 @@ def _new_icon_canvas(size_px: int):
 
 
 def _draw_envelope_icon(size_px: int, color: str) -> "Image.Image":
-    """E-mail: retângulo (corpo do envelope) + linha em "V" (aba)."""
+    """E-mail: corpo com cantos arredondados + vinco em "V" — mesmas
+    proporções do envelope do favicon (app/static/img/favicon.ico), só que em
+    traço (contorno) em vez de preenchido, para não pesar ao lado do texto
+    fino da assinatura."""
     canvas, ss = _new_icon_canvas(size_px)
     d = ImageDraw.Draw(canvas)
     rgba = _hex_to_rgba(color)
@@ -106,27 +109,40 @@ def _draw_envelope_icon(size_px: int, color: str) -> "Image.Image":
     top = int(ss * 0.22)
     bottom = ss - top
     left, right = pad_x, ss - pad_x
-    d.rectangle([left, top, right, bottom], outline=rgba, width=line_w)
-    flap_bottom = top + (bottom - top) * 0.62
+    corner_radius = int((right - left) * 0.09)
+    d.rounded_rectangle([left, top, right, bottom], radius=corner_radius, outline=rgba, width=line_w)
+    flap_bottom = top + (bottom - top) * 0.56
     d.line([(left, top), (ss / 2, flap_bottom), (right, top)], fill=rgba, width=line_w, joint="curve")
     return canvas.resize((size_px, size_px), Image.LANCZOS)
 
 
 def _draw_phone_icon(size_px: int, color: str) -> "Image.Image":
-    """Telefone: traço diagonal arredondado com "bolhas" nas pontas (fone/
-    receiver simplificado) — mesmo espírito de ícone de linha do envelope."""
+    """Telefone: silhueta de aparelho (retângulo vertical arredondado, com
+    "alto-falante" no topo e botão na base) — reconhecível de imediato como
+    "telefone", ao contrário de um ícone abstrato de linha/cápsula."""
     canvas, ss = _new_icon_canvas(size_px)
     d = ImageDraw.Draw(canvas)
     rgba = _hex_to_rgba(color)
-    line_w = max(2, int(ss * 0.16))
-    p1 = (ss * 0.22, ss * 0.80)
-    p2 = (ss * 0.42, ss * 0.56)
-    p3 = (ss * 0.58, ss * 0.44)
-    p4 = (ss * 0.78, ss * 0.20)
-    d.line([p1, p2, p3, p4], fill=rgba, width=line_w, joint="curve")
-    end_r = line_w * 0.62
-    for cx, cy in (p1, p4):
-        d.ellipse([cx - end_r, cy - end_r, cx + end_r, cy + end_r], fill=rgba)
+    line_w = max(2, int(ss * 0.05))
+    w = ss * 0.46
+    h = ss * 0.86
+    left = (ss - w) / 2
+    top = (ss - h) / 2
+    right = left + w
+    bottom = top + h
+    radius = w * 0.22
+    d.rounded_rectangle([left, top, right, bottom], radius=radius, outline=rgba, width=line_w)
+
+    speaker_w = w * 0.34
+    speaker_y = top + h * 0.14
+    d.line(
+        [(ss / 2 - speaker_w / 2, speaker_y), (ss / 2 + speaker_w / 2, speaker_y)],
+        fill=rgba, width=line_w, joint="curve",
+    )
+
+    btn_r = w * 0.10
+    btn_y = bottom - h * 0.11
+    d.ellipse([ss / 2 - btn_r, btn_y - btn_r, ss / 2 + btn_r, btn_y + btn_r], outline=rgba, width=line_w)
     return canvas.resize((size_px, size_px), Image.LANCZOS)
 
 
