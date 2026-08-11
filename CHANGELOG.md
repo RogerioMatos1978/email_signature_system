@@ -180,7 +180,7 @@ A fonte Neo Sans foi extraída do arquivo PowerPoint oficial da própria organiz
 
 ### Alterado (breaking change)
 - Login trocado de e-mail para **usuário** em todo o sistema (`User.email` → `User.username`). Requer reset do banco em instalações existentes — veja o aviso no README.
-- Administrador inicial provisionado por padrão como `RogerioMatos` / `Admin@123` (via `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` no `.env`); a senha é trocada obrigatoriamente no primeiro login.
+- Administrador inicial provisionado por padrão como `EmAssinaturas` / `Admin@123` (via `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` no `.env`); a senha é trocada obrigatoriamente no primeiro login.
 
 ## [1.0.2] — 2026-07-28
 
@@ -223,17 +223,17 @@ with app.app_context():
         print('Usuarios no banco:')
         for u in users:
             print(f' - {u.username} | papel={u.role} | ativo={u.is_active_flag} | trocar_senha={u.must_change_password}')
-        admin = User.query.filter_by(username='rogeriomatos').first()
+        admin = User.query.filter_by(username='EmAssinaturas').first()
         if admin:
             admin.set_password('Admin@123')
             admin.must_change_password = True
             admin.current_session_token = None
             db.session.commit()
             print()
-            print('>>> Senha do rogeriomatos RESETADA para: Admin@123')
+            print('>>> Senha do EmAssinaturas RESETADA para: Admin@123')
         else:
             print()
-            print('>>> Usuario rogeriomatos NAO existe no banco.')
+            print('>>> Usuario EmAssinaturas NAO existe no banco.')
     except Exception as e:
         print('ERRO DE BANCO:', e)
 "
