@@ -36,7 +36,7 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
    No mínimo, defina:
    - `SECRET_KEY` — gere uma chave única: `python3 -c "import secrets; print(secrets.token_hex(32))"`
-   - `ADMIN_SEED_USERNAME` e `ADMIN_SEED_PASSWORD` — conta de administrador criada automaticamente no primeiro start (já vem preenchido com `RogerioMatos` / `Admin@123` no `.env.example`; troque a senha se for usar em produção).
+   - `ADMIN_SEED_USERNAME` e `ADMIN_SEED_PASSWORD` — conta de administrador criada automaticamente no primeiro start (já vem preenchido com `EmAssinaturas` / `Admin@123` no `.env.example`; troque a senha se for usar em produção).
 
 2. Suba o container:
 
@@ -193,7 +193,7 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 
 ## Primeiro acesso
 
-1. Faça login com o usuário/senha definidos em `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` (por padrão: `RogerioMatos` / `Admin@123`).
+1. Faça login com o usuário/senha definidos em `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` (por padrão: `EmAssinaturas` / `Admin@123`).
 2. O sistema exigirá a troca de senha no primeiro login (por segurança).
 3. Como administrador, acesse **Modelos** e cadastre a imagem de fundo padrão da assinatura, posicionando os campos (nome, função, unidade, e-mail, telefone e foto) com o editor de arrastar e soltar. Os dois modelos oficiais FIEG 2026 (sem foto / com foto) já vêm prontos e ativados automaticamente.
 4. Cadastre os usuários padrão e supervisores em **Usuários** — uma senha temporária é exibida uma única vez na tela; repasse-a com segurança à pessoa (o sistema não envia e-mails).
