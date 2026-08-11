@@ -46,7 +46,7 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 3. Acesse:
    - No próprio servidor: **http://localhost:5002**
-   - De qualquer outro computador na rede local: **http://192.169.60.69:5002** (ajuste para o IP atual do servidor, se mudar — veja como descobrir abaixo)
+   - De qualquer outro computador na rede local: **http://IP:5002** (ajuste para o IP atual do servidor, se mudar — veja como descobrir abaixo)
 
    > O sistema roda na porta **5002** (não usa a porta 5000), tanto internamente quanto no mapeamento do `docker-compose.yml`. O Gunicorn já escuta em `0.0.0.0`, então qualquer máquina na mesma rede local consegue acessar pelo IP do servidor, sem configuração adicional — só verifique se o firewall do Windows libera a porta 5002 para conexões de entrada.
 
