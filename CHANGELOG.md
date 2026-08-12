@@ -2,6 +2,21 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.4.0] — 2026-08-12
+
+### Segurança
+
+- **Crítico**: o arquivo `.env` (com `SECRET_KEY` e senha do administrador reais) estava versionado no Git e havia sido enviado ao repositório remoto. Adicionado `.gitignore` (não existia antes) e removido `.env`, `__pycache__/`, `.idea/` e afins do controle de versão. **Ação obrigatória para quem for expor o sistema na internet:** gerar uma `SECRET_KEY` nova e trocar a senha de admin — ver seção 0 do `GUIA_DEPLOY.md`.
+- Suporte opcional a proxy reverso confiável: `TRUST_PROXY_HEADERS` (padrão `false`) ativa `ProxyFix` (Werkzeug), fazendo o Flask enxergar o IP e o `https` reais do visitante quando o sistema roda atrás de um proxy como Caddy/nginx — necessário para o rate limiting por IP e a auditoria funcionarem corretamente em produção. Só deve ser ativado quando existir de fato um proxy confiável na frente (senão qualquer visitante poderia forjar os cabeçalhos).
+- Cabeçalho `Strict-Transport-Security` (HSTS) passa a ser enviado automaticamente quando a requisição chega via HTTPS.
+
+### Adicionado
+
+- `GUIA_DEPLOY.md`: guia passo a passo para colocar o sistema online (VPS, domínio, DNS, Docker, HTTPS automático via Caddy, backup, checklist de segurança).
+- `docker-compose.prod.yml`: variante do Compose para produção — o serviço `web` não fica exposto diretamente à internet (só o Caddy, nas portas 80/443).
+- `Caddyfile.example` e `scripts/backup.sh` (backup do volume de dados, pronto para agendar via cron).
+- `.env.example`: novas variáveis documentadas (`TRUST_PROXY_HEADERS`, `GUNICORN_WORKERS`).
+
 ## [2.3.0] — 2026-08-11
 
 ### Adicionado

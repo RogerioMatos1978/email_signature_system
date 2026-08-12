@@ -60,6 +60,23 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Quer colocar o sistema online, acessível pela internet (não só na rede
+> local)?** Veja o [`GUIA_DEPLOY.md`](GUIA_DEPLOY.md) — passo a passo com VPS,
+> domínio, HTTPS automático (Caddy) e backup. **Leia a seção 0 do guia antes
+> de tudo:** um `.env` com segredos reais chegou a ser versionado no Git neste
+> projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
+> tratadas como comprometidas e trocadas.
+
+> **Atualizando de uma instalação anterior à v2.4.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Este é um reforço de
+> segurança para quem for expor o sistema na internet (não muda nada no uso
+> em rede local): `.env` deixou de ser versionado no Git (era um risco de
+> vazamento de credenciais), suporte opcional a proxy reverso confiável
+> (`TRUST_PROXY_HEADERS`, para IP/HTTPS reais chegarem corretos atrás do
+> Caddy/nginx), cabeçalho HSTS quando o acesso é HTTPS, e novos arquivos de
+> apoio para deploy em produção (`docker-compose.prod.yml`, `Caddyfile.example`,
+> `scripts/backup.sh`, `GUIA_DEPLOY.md`).
+>
 > **Atualizando de uma instalação anterior à v2.3.0?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Novidades: favicon novo com
 > as cores da marca, e ícones de e-mail/telefone/WhatsApp redesenhados (no

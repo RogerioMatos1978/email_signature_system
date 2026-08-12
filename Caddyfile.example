@@ -1,0 +1,16 @@
+# ==============================================================================
+# Configuração do Caddy (proxy reverso + HTTPS automático).
+#
+# Copie este arquivo para "Caddyfile" (sem ".example") e troque o domínio
+# abaixo pelo seu. O Caddy detecta sozinho e renova o certificado HTTPS
+# (Let's Encrypt) — não precisa configurar nada de SSL manualmente.
+#
+#   cp Caddyfile.example Caddyfile
+#
+# Pré-requisito: o domínio já precisa estar apontando (registro DNS tipo A)
+# para o IP da sua VPS antes de subir o Caddy — ver GUIA_DEPLOY.md, passo 4.
+# ==============================================================================
+
+assinaturas.suaempresa.com.br {
+    reverse_proxy web:5002
+}

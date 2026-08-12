@@ -1,7 +1,7 @@
 """Helpers de segurança reutilizados pelos blueprints."""
 import os
 
-from flask import send_from_directory, abort
+from flask import send_from_directory, abort, request
 
 
 def safe_send_file(base_dir: str, filename: str, download_name: str | None = None, as_attachment: bool = True):
@@ -51,4 +51,14 @@ def apply_security_headers(response):
     )
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault("X-Permitted-Cross-Domain-Policies", "none")
+
+    # HSTS: só faz sentido (e só é seguro) anunciar quando a requisição já
+    # chegou via HTTPS de verdade — `request.is_secure` só reflete isso
+    # corretamente atrás de um proxy reverso se TRUST_PROXY_HEADERS estiver
+    # ativo (ver app/config.py e o ProxyFix em app/__init__.py). Em uso local
+    # (HTTP puro, sem proxy) este cabeçalho simplesmente não é enviado.
+    if request.is_secure:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=63072000; includeSubDomains"
+        )
     return response

@@ -42,6 +42,16 @@ class Config:
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
 
+    # Só ativa quando o sistema estiver atrás de um proxy reverso confiável
+    # (ex.: Caddy/nginx fazendo o HTTPS, ver GUIA_DEPLOY.md) — nesse caso o
+    # Flask passa a confiar nos cabeçalhos X-Forwarded-For/Proto/Host que o
+    # proxy define, e enxerga o IP e o "https" reais do visitante (sem isso,
+    # o rate limiting por IP e a auditoria do portal público veriam sempre o
+    # IP do proxy, não o do visitante). NUNCA ativar se a aplicação estiver
+    # diretamente exposta à internet sem um proxy na frente — qualquer
+    # visitante poderia forjar esses cabeçalhos e enganar o rate limiting.
+    TRUST_PROXY_HEADERS = os.environ.get("TRUST_PROXY_HEADERS", "false").lower() == "true"
+
     # Seed do administrador inicial (usado apenas se não existir nenhum admin)
     ADMIN_SEED_NAME = os.environ.get("ADMIN_SEED_NAME", "Administrador")
     ADMIN_SEED_USERNAME = os.environ.get("ADMIN_SEED_USERNAME")
@@ -51,7 +61,7 @@ class Config:
     OUTPUT_MAX_WIDTH = int(os.environ.get("OUTPUT_MAX_WIDTH", 1300))
     JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", 88))
 
-    APP_VERSION = "2.3.0"
+    APP_VERSION = "2.4.0"
 
 
 class DevelopmentConfig(Config):
