@@ -20,7 +20,7 @@ from ...decorators import admin_required, roles_required
 from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm
 from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog, ImportJob
 from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
-from ...utils.template_fields import validate_fields_json, TemplateFieldsError, DEFAULT_UNIT
+from ...utils.template_fields import validate_fields_json, TemplateFieldsError
 from ...utils.image_utils import render_signature, SignatureRenderError
 from ...utils.security import safe_send_file
 from ...utils.flashing import flash_form_errors
@@ -422,9 +422,6 @@ def user_delete(user_id):
 # ---------------------------------------------------------------------------
 
 # Cabeçalhos aceitos (comparação sem acentos/maiúsculas): coluna → campo interno
-# Observação: "unidade"/"gerencia" continuam reconhecidas por compatibilidade
-# com planilhas antigas, mas a partir da v2.0.0 o valor da coluna é IGNORADO —
-# a Unidade / Gerência é sempre fixada em DEFAULT_UNIT (ver loop de geração).
 _SPREADSHEET_COLUMNS = {
     "nome": "full_name",
     "nome completo": "full_name",
@@ -444,9 +441,8 @@ _SPREADSHEET_COLUMNS = {
     "celular whatsapp": "whatsapp",
     "segundo telefone": "whatsapp",
 }
-# "unit" não é mais obrigatório na planilha (é sempre substituído por
-# DEFAULT_UNIT); "whatsapp" sempre foi opcional.
-_REQUIRED_FIELDS = ("full_name", "role_title", "signature_email", "phone")
+# "whatsapp" é opcional; os demais, incluindo "unit", são obrigatórios na planilha.
+_REQUIRED_FIELDS = ("full_name", "role_title", "unit", "signature_email", "phone")
 _FIELD_LABELS = {
     "full_name": "Nome", "role_title": "Função", "unit": "Unidade",
     "signature_email": "E-mail", "phone": "Telefone", "whatsapp": "WhatsApp",
@@ -546,8 +542,8 @@ def _map_columns(header_row):
         raise ValueError(
             "Colunas obrigatórias não encontradas na planilha: "
             + ", ".join(_FIELD_LABELS[f] for f in missing)
-            + ". Use o cabeçalho: Nome; Função; E-mail; Telefone "
-            + "(Unidade é preenchida automaticamente; WhatsApp é opcional)."
+            + ". Use o cabeçalho: Nome; Função; Unidade; E-mail; Telefone "
+            + "(WhatsApp é opcional)."
         )
     return mapping
 
@@ -625,9 +621,6 @@ def _run_batch_import_job(app, job_id, user_id, data_rows, mapping, output_forma
                 for i, (line_no, row) in enumerate(enumerate(data_rows, start=2), start=1):  # linha 1 = cabeçalho
                     values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
                               for idx, field in mapping.items()}
-                    # Unidade / Gerência sempre fixa (v2.0.0) — o que estiver
-                    # na planilha (se houver essa coluna) é descartado.
-                    values["unit"] = DEFAULT_UNIT
                     values.setdefault("whatsapp", "")
                     # O número de WhatsApp da planilha só é usado quando
                     # "Incluir ícones" está marcado (aplica ao lote inteiro).
@@ -749,7 +742,7 @@ def batch_import():
         extra.setdefault("zip_name", None)
         extra.setdefault("generated", 0)
         return render_template(
-            "admin/batch_import.html", form=form, template=template, unit_label=DEFAULT_UNIT, **extra
+            "admin/batch_import.html", form=form, template=template, **extra
         )
 
     def _fail(message):
@@ -821,7 +814,7 @@ def batch_import():
             flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
         return render_template(
             "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
-            zip_name=job.zip_name, generated=job.generated, template=template, unit_label=DEFAULT_UNIT,
+            zip_name=job.zip_name, generated=job.generated, template=template,
         )
 
     if form.is_submitted():
@@ -876,7 +869,7 @@ def batch_import_result(job_id):
         flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
     return render_template(
         "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
-        zip_name=job.zip_name, generated=job.generated, template=template, unit_label=DEFAULT_UNIT,
+        zip_name=job.zip_name, generated=job.generated, template=template,
     )
 
 

@@ -18,8 +18,6 @@ from wtforms.validators import (
     ValidationError,
 )
 
-from .utils.template_fields import UNIT_CHOICES
-
 PHONE_REGEX = r"^[0-9()+\-\s]{8,20}$"
 USERNAME_REGEX = r"^[A-Za-z0-9_.\-]{3,80}$"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -159,10 +157,13 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="WhatsApp inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
-    unit = SelectField(
+    unit = StringField(
         "Unidade / Gerência",
-        choices=UNIT_CHOICES,
-        validators=[DataRequired(message="Selecione a unidade / gerência.")],
+        validators=[
+            DataRequired(message="Informe a unidade / gerência."),
+            Length(min=2, max=45, message="A unidade / gerência deve ter entre 2 e 45 caracteres."),
+            no_control_chars,
+        ],
     )
     with_icons = BooleanField("Incluir ícones antes do e-mail, telefone e WhatsApp", default=False)
     with_photo = BooleanField("Gerar assinatura com foto", default=False)

@@ -67,6 +67,12 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 > projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
 > tratadas como comprometidas e trocadas.
 
+> **Atualizando de uma instalação anterior à v2.5.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). O campo "Unidade / Gerência"
+> volta a ser texto livre (geração individual e importação em lote) — a lista
+> fixa de opções da v2.0.0 foi removida. Na planilha de importação, a coluna
+> "Unidade"/"Gerência" volta a ser obrigatória.
+>
 > **Atualizando de uma instalação anterior à v2.4.0?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Este é um reforço de
 > segurança para quem for expor o sistema na internet (não muda nada no uso

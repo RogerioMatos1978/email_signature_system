@@ -2,6 +2,12 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.5.0] — 2026-08-13
+
+### Alterado
+
+- **Unidade / Gerência volta a ser um campo de texto livre**, na geração individual e na importação em lote — deixou de ser a lista fixa de opções (só "UI Rio Verde - Sesi Senai") introduzida na v2.0.0. Na importação por planilha, a coluna "Unidade"/"Gerência" volta a ser obrigatória e o valor de cada linha é usado normalmente (deixou de ser ignorado/sobrescrito).
+
 ## [2.4.0] — 2026-08-12
 
 ### Segurança
