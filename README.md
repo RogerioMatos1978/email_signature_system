@@ -67,6 +67,14 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 > projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
 > tratadas como comprometidas e trocadas.
 
+> **Atualizando de uma instalação anterior à v2.7.1?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Correções em "Gerar
+> assinatura": QR Code do WhatsApp aumentado para 36px com posicionamento
+> vertical corrigido, e fim da duplicação do número quando "Este telefone
+> também é o WhatsApp" está marcado. O campo separado "WhatsApp (opcional)" e
+> o ícone automático de WhatsApp foram removidos dessa tela (a importação de
+> planilha não foi afetada).
+>
 > **Atualizando de uma instalação anterior à v2.7.0?** Muda o banco (nova
 > coluna `qrcode_filename` em `signature_records`) — é preciso resetar o
 > volume uma vez:

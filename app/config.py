@@ -64,7 +64,7 @@ class Config:
     OUTPUT_MAX_WIDTH = int(os.environ.get("OUTPUT_MAX_WIDTH", 1300))
     JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", 88))
 
-    APP_VERSION = "2.7.0"
+    APP_VERSION = "2.7.1"
 
 
 class DevelopmentConfig(Config):

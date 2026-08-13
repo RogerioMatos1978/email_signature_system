@@ -170,14 +170,13 @@ def new_signature():
             )
 
         phone_value = sanitize_plain_text(form.phone.data, 40)
-        # "Este telefone também é o WhatsApp": reaproveita o número já
-        # digitado no Telefone, sem precisar redigitar no campo separado —
-        # tem prioridade sobre o campo "WhatsApp (opcional)" quando marcado
-        # (só disponível na geração individual, nunca na importação de planilha).
-        if form.phone_is_whatsapp.data:
-            whatsapp_value = phone_value
-        else:
-            whatsapp_value = sanitize_plain_text(form.whatsapp.data, 40) if form.whatsapp.data else ""
+        # O campo separado "WhatsApp (opcional)" foi removido — a única forma
+        # de ter um número de WhatsApp na assinatura agora é marcar "Este
+        # telefone também é o WhatsApp", que reaproveita o número já digitado
+        # no Telefone (só disponível na geração individual, nunca na
+        # importação de planilha, que mantém seu próprio fluxo inalterado).
+        phone_is_whatsapp = bool(form.phone_is_whatsapp.data)
+        whatsapp_value = phone_value if phone_is_whatsapp else ""
 
         values = {
             "full_name": sanitize_plain_text(form.full_name.data, 80),
@@ -189,7 +188,7 @@ def new_signature():
         }
         with_icons = bool(form.with_icons.data)
 
-        # QR Code do WhatsApp (opcional, 32x32px na frente do número) — só
+        # QR Code do WhatsApp (opcional, 36x36px na frente do número) — só
         # existe se houver de fato um número de WhatsApp para acompanhar.
         qrcode_filename = None
         if values["whatsapp"] and form.whatsapp_qrcode.data and form.whatsapp_qrcode.data.filename:
@@ -224,11 +223,21 @@ def new_signature():
             current_app.config["TEMPLATES_UPLOAD_DIR"], active_template.background_filename
         )
 
+        # Evita duplicar o mesmo número na assinatura (uma vez como
+        # "Telefone", outra como "WhatsApp"): quando o telefone está marcado
+        # como WhatsApp, a linha de Telefone não é desenhada — o número
+        # aparece só uma vez, na linha de WhatsApp (com QR Code, se enviado).
+        # O registro no banco (values/record) continua com o telefone
+        # completo, só a IMAGEM gerada omite a linha redundante.
+        render_values = dict(values)
+        if phone_is_whatsapp:
+            render_values["phone"] = ""
+
         try:
             render_signature(
                 background_path=background_path,
                 fields_config=active_template.get_fields(),
-                values=values,
+                values=render_values,
                 photo_path=photo_path,
                 output_path=output_path,
                 output_format=output_format,
@@ -237,6 +246,7 @@ def new_signature():
                 variant=variant,
                 with_icons=with_icons,
                 qrcode_path=qrcode_path,
+                whatsapp_icon_enabled=False,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")

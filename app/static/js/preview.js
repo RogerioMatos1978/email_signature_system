@@ -41,11 +41,15 @@
     unit: form.querySelector("#unit"),
     signature_email: form.querySelector("#signature_email"),
     phone: form.querySelector("#phone"),
-    whatsapp: form.querySelector("#whatsapp"),
   };
   var photoInput = form.querySelector("#photo");
   var withPhotoCheckbox = form.querySelector("#with_photo");
   var photoFieldWrap = document.getElementById("photoField");
+  // Não há mais um campo "WhatsApp" separado: o número aparece como WhatsApp
+  // na assinatura só quando "Este telefone também é o WhatsApp" está
+  // marcado — nesse caso a linha de Telefone some (mesmo número, uma vez só,
+  // igual ao que o servidor gera) e o valor do Telefone é espelhado ali.
+  var phoneIsWhatsappCheckbox = form.querySelector("#phone_is_whatsapp");
 
   function currentVariant() {
     var wantsPhoto = withPhotoCheckbox && withPhotoCheckbox.checked;
@@ -78,9 +82,9 @@
     return text;
   }
 
-  function drawField(key, cfg) {
+  function drawField(key, cfg, overrideValue) {
     var el = fieldMap[key];
-    var value = el ? el.value.trim() : "";
+    var value = overrideValue != null ? overrideValue : (el ? el.value.trim() : "");
     if (!value) return;
 
     value = value.slice(0, cfg.max_chars || 60);
@@ -139,9 +143,20 @@
     ctx.drawImage(bg.img, 0, 0, canvas.width, canvas.height);
 
     var fields = variant.fields || {};
-    ["full_name", "role_title", "unit", "signature_email", "phone", "whatsapp"].forEach(function (key) {
+    ["full_name", "role_title", "unit", "signature_email"].forEach(function (key) {
       drawField(key, fields[key] || {});
     });
+
+    // Telefone/WhatsApp: mesmo número, nunca as duas linhas juntas (igual à
+    // imagem final gerada no servidor) — com o checkbox marcado, o número
+    // aparece só como WhatsApp; sem marcar, só como Telefone.
+    var phoneVal = fieldMap.phone ? fieldMap.phone.value.trim() : "";
+    var isWhatsapp = !!(phoneIsWhatsappCheckbox && phoneIsWhatsappCheckbox.checked);
+    if (isWhatsapp) {
+      drawField("whatsapp", fields.whatsapp || {}, phoneVal);
+    } else {
+      drawField("phone", fields.phone || {});
+    }
 
     if (variantKey === "com_foto") {
       drawPhoto(fields.photo);
@@ -158,6 +173,10 @@
     var el = fieldMap[key];
     if (el) el.addEventListener("input", scheduleDraw);
   });
+
+  if (phoneIsWhatsappCheckbox) {
+    phoneIsWhatsappCheckbox.addEventListener("change", scheduleDraw);
+  }
 
   if (withPhotoCheckbox) {
     withPhotoCheckbox.addEventListener("change", function () {

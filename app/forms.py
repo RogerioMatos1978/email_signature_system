@@ -177,13 +177,6 @@ class SignatureForm(FlaskForm):
             FileSize(max_size=MAX_IMAGE_BYTES, message="A imagem deve ter no máximo 5MB."),
         ],
     )
-    whatsapp = StringField(
-        "WhatsApp (opcional)",
-        validators=[
-            Optional(),
-            Regexp(PHONE_REGEX, message="WhatsApp inválido. Use apenas números, espaços, parênteses, + e -."),
-        ],
-    )
     unit = StringField(
         "Unidade / Gerência",
         validators=[

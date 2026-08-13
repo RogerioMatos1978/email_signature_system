@@ -2,6 +2,20 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.7.1] — 2026-08-13
+
+### Corrigido
+
+- **QR Code do WhatsApp**: aumentado de 32px para **36px** e corrigida a centralização vertical (a fórmula antiga, pensada para os ícones pequenos escalados a partir da fonte, deslocava o QR para baixo demais em relação ao texto — agora ele fica alinhado ao centro visual da linha, como um "vertical-align: middle").
+- **Duplicação do número ao marcar "Este telefone também é o WhatsApp"**: a assinatura mostrava o mesmo número duas vezes (uma vez como "Telefone", outra como "WhatsApp"). Agora, quando o telefone está marcado como WhatsApp, o número aparece só uma vez, na linha de WhatsApp — a linha de Telefone não é mais desenhada nesse caso (o registro de auditoria continua com o telefone completo, só a imagem gerada é que deixou de duplicar).
+
+### Alterado
+
+- **Campo "WhatsApp (opcional)" removido de "Gerar assinatura"**: a única forma de ter um número de WhatsApp na assinatura agora é marcar "Este telefone também é o WhatsApp" — sem digitar de novo em outro campo. Sem alteração na importação de planilha, que continua com sua própria coluna de WhatsApp.
+- **Ícone automático de WhatsApp removido de "Gerar assinatura"**: com o QR Code assumindo esse papel, o ícone desenhado automaticamente pelo sistema para o campo WhatsApp deixou de aparecer nessa tela (mesmo com "Incluir ícones" marcado) — e-mail e telefone continuam com ícone normalmente. A importação de planilha não foi afetada: o ícone de WhatsApp automático continua funcionando lá exatamente como antes.
+
+Sem mudança de banco de dados.
+
 ## [2.7.0] — 2026-08-13
 
 ### Adicionado
