@@ -2,6 +2,12 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.5.1] — 2026-08-13
+
+### Corrigido
+
+- **Layout do painel: cards distribuídos de forma mais equilibrada na tela**, em vez de ficarem presos a uma faixa central estreita (max-width 1100px) com uma sobra enorme de espaço vazio nas laterais em monitores largos, e cards "órfãos" (ex.: 5 cartões de estatística viravam 4 numa linha + 1 sozinho embaixo). Os grids de cards agora se ajustam automaticamente à largura disponível (CSS `auto-fit`/`minmax`, sem precisar de várias media queries por breakpoint), o container passou a usar até 1400px de largura (antes 1100px), e o padding interno das páginas e dos cards foi reduzido um pouco.
+
 ## [2.5.0] — 2026-08-13
 
 ### Alterado
