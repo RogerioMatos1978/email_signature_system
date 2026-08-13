@@ -2,6 +2,21 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.8.0] — 2026-08-13
+
+### Adicionado
+
+- **Ícone de WhatsApp condicional no Telefone**: em "Gerar assinatura", com "Incluir ícones" marcado, o campo Telefone passa a mostrar o ícone de WhatsApp em vez do ícone padrão de telefone quando "Este telefone também é o WhatsApp" está marcado — desmarcado, continua com o ícone padrão de telefone. O texto/posição do campo não mudam em nenhum dos dois casos.
+- **Validação de CPF por dígito verificador**: o cadastro de "Usuário padrão" (Novo usuário e Importar CPFs) agora valida o CPF pelo algoritmo oficial (módulo 11), rejeitando CPFs com 11 dígitos mas números errados (ex.: digitação trocada) e sequências óbvias como "000.000.000-00".
+- **Máscara de CPF no cadastro de usuário**: em Admin → Usuários → Novo usuário, ao selecionar o perfil "Usuário padrão", o campo Usuário formata automaticamente como CPF (000.000.000-00) enquanto o administrador digita — continua aceitando só números como entrada.
+- **Informativo Usuário/CPF na tela de login**: a tela de login agora indica que contas de Usuário padrão usam o CPF (somente números) como usuário, e Supervisor/Administrador usam o usuário cadastrado normalmente.
+
+### Alterado
+
+- **Troca de senha deixou de ser obrigatória**: contas recém-criadas ou com senha redefinida pelo administrador (temporária ou CPF) não são mais forçadas a trocar a senha no primeiro acesso — podem continuar usando o sistema normalmente e trocar quando quiserem em "Minha conta". As mensagens de criação/importação de usuário e a tela "Minha conta" foram atualizadas para deixar isso claro.
+
+Sem mudança de banco de dados.
+
 ## [2.7.2] — 2026-08-13
 
 ### Removido

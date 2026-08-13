@@ -192,16 +192,8 @@ def _register_hooks(app):
             return redirect(url_for("auth.login"))
         return None
 
-    # Força troca de senha em contas recém-criadas/resetadas pelo admin antes
-    # de liberar qualquer outra funcionalidade (item de segurança).
-    allowed_endpoints = {"auth.change_password", "auth.logout", "static", "healthz"}
-
-    @app.before_request
-    def enforce_password_change():
-        if not current_user.is_authenticated:
-            return None
-        if not getattr(current_user, "must_change_password", False):
-            return None
-        if request.endpoint in allowed_endpoints:
-            return None
-        return redirect(url_for("auth.change_password"))
+    # A troca de senha em contas recém-criadas/resetadas pelo admin é
+    # OPCIONAL: o usuário pode continuar usando o sistema normalmente com a
+    # senha inicial (temporária ou CPF) e trocar quando quiser, em "Minha
+    # conta" (auth.change_password). Não há mais bloqueio/redirecionamento
+    # forçado — a flag must_change_password fica só como informação.

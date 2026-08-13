@@ -13,7 +13,7 @@
   <h2>Usuário criado com sucesso</h2>
   <p>Senha temporária (copie agora — não será exibida novamente):</p>
   <p class="temp-password">{{ temp_password }}</p>
-  <p class="muted">O usuário precisará trocar a senha no primeiro acesso.</p>
+  <p class="muted">A troca de senha é opcional — o usuário pode continuar usando esta senha ou trocá-la quando quiser em "Minha conta".</p>
   <a href="{{ url_for('admin.users_list') }}" class="btn btn--primary">Voltar para a lista</a>
 </div>
 {% else %}
@@ -21,7 +21,7 @@
   <form method="post" novalidate>
     {{ form.hidden_tag() }}
     {{ fh.field(form.name) }}
-    {% if not user %}{{ fh.field(form.username) }}{% else %}
+    {% if not user %}{{ fh.field(form.username, "Perfil \"Usuário padrão\": digite o CPF, só números — a formatação é aplicada automaticamente. Perfis Supervisor/Administrador: usuário livre.") }}{% else %}
       <div class="field"><label class="field__label">Usuário</label><p class="field__input field__input--readonly">{{ user.username }}</p></div>
     {% endif %}
     {{ fh.field(form.role) }}
@@ -29,5 +29,57 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar alterações' if user else 'Criar usuário' }}</button>
   </form>
 </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not user %}
+<script>
+(function () {
+  "use strict";
+  var usernameInput = document.getElementById("username");
+  var roleSelect = document.getElementById("role");
+  if (!usernameInput || !roleSelect) return;
+
+  function onlyDigits(value) {
+    return (value || "").replace(/\D+/g, "").slice(0, 11);
+  }
+
+  function formatCpf(value) {
+    var d = onlyDigits(value);
+    if (d.length > 9) return d.slice(0, 3) + "." + d.slice(3, 6) + "." + d.slice(6, 9) + "-" + d.slice(9);
+    if (d.length > 6) return d.slice(0, 3) + "." + d.slice(3, 6) + "." + d.slice(6);
+    if (d.length > 3) return d.slice(0, 3) + "." + d.slice(3);
+    return d;
+  }
+
+  function isCpfRole() {
+    return roleSelect.value === "user";
+  }
+
+  function applyModeForRole() {
+    if (isCpfRole()) {
+      usernameInput.value = formatCpf(usernameInput.value);
+      usernameInput.setAttribute("inputmode", "numeric");
+      usernameInput.setAttribute("placeholder", "000.000.000-00");
+      usernameInput.setAttribute("maxlength", "14");
+    } else {
+      usernameInput.removeAttribute("inputmode");
+      usernameInput.removeAttribute("placeholder");
+      usernameInput.removeAttribute("maxlength");
+    }
+  }
+
+  usernameInput.addEventListener("input", function () {
+    if (!isCpfRole()) return;
+    var atEnd = usernameInput.selectionStart === usernameInput.value.length;
+    usernameInput.value = formatCpf(usernameInput.value);
+    if (atEnd) usernameInput.setSelectionRange(usernameInput.value.length, usernameInput.value.length);
+  });
+
+  roleSelect.addEventListener("change", applyModeForRole);
+  applyModeForRole();
+})();
+</script>
 {% endif %}
 {% endblock %}

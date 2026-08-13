@@ -19,7 +19,7 @@ from ...extensions import db
 from ...decorators import admin_required, roles_required
 from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm, CpfImportForm
 from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog, ImportJob
-from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
+from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text, is_valid_cpf
 from ...utils.template_fields import validate_fields_json, TemplateFieldsError
 from ...utils.image_utils import render_signature, SignatureRenderError
 from ...utils.security import safe_send_file
@@ -310,7 +310,8 @@ def user_new():
             db.session.commit()
             flash(
                 f'Usuário padrão "{user.name}" criado com sucesso. Login e senha inicial: '
-                f"CPF {username} (somente números). Ele(a) precisará trocar a senha no primeiro acesso.",
+                f"CPF {username} (somente números). A troca de senha é opcional — ele(a) pode "
+                "trocar quando quiser em \"Minha conta\".",
                 "success",
             )
             return render_template("admin/user_form.html", form=UserCreateForm(formdata=None), user=None, temp_password=None)
@@ -320,7 +321,11 @@ def user_new():
         db.session.add(user)
         db.session.commit()
 
-        flash("Usuário criado com sucesso. Copie a senha temporária abaixo — ela não será exibida novamente.", "success")
+        flash(
+            "Usuário criado com sucesso. Copie a senha temporária abaixo — ela não será exibida "
+            "novamente. A troca de senha é opcional.",
+            "success",
+        )
         return render_template("admin/user_form.html", form=UserCreateForm(formdata=None), user=user, temp_password=temp_password)
 
     if form.is_submitted():
@@ -524,6 +529,9 @@ def users_import_cpf():
             if len(cpf) != 11:
                 errors.append(f"Linha {line_no}: CPF inválido (deve ter 11 dígitos) — \"{values.get('cpf', '')}\".")
                 continue
+            if not is_valid_cpf(cpf):
+                errors.append(f"Linha {line_no}: CPF inválido (dígitos verificadores não conferem) — \"{values.get('cpf', '')}\".")
+                continue
             if cpf in seen_cpfs:
                 errors.append(f"Linha {line_no}: CPF {cpf} duplicado nesta planilha.")
                 continue
@@ -546,7 +554,8 @@ def users_import_cpf():
         if created:
             db.session.commit()
             flash(
-                f"{len(created)} usuário(s) padrão criado(s) com sucesso. Login e senha inicial de cada um: o próprio CPF.",
+                f"{len(created)} usuário(s) padrão criado(s) com sucesso. Login e senha inicial de "
+                "cada um: o próprio CPF. A troca de senha é opcional.",
                 "success",
             )
         else:

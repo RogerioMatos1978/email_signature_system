@@ -20,6 +20,8 @@ from wtforms.validators import (
     ValidationError,
 )
 
+from .utils.validators import is_valid_cpf
+
 PHONE_REGEX = r"^[0-9()+\-\s]{8,20}$"
 USERNAME_REGEX = r"^[A-Za-z0-9_.\-]{3,80}$"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
@@ -90,6 +92,8 @@ class UserCreateForm(FlaskForm):
             raise ValidationError(
                 'Para o perfil "Usuário padrão", o campo Usuário deve ser o CPF com 11 dígitos (somente números).'
             )
+        if not is_valid_cpf(digits):
+            raise ValidationError("CPF inválido. Confira os números digitados.")
         field.data = digits
 
 
@@ -168,9 +172,11 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="Telefone inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
-    # Só marca o número de Telefone também como WhatsApp para fins de
-    # registro/auditoria — não desenha uma linha extra na imagem (o texto do
-    # Telefone continua sempre na mesma posição, nunca se desloca).
+    # Marca o número de Telefone também como WhatsApp: grava o valor no
+    # registro para fins de auditoria/busca E troca o ícone desenhado antes
+    # do campo (quando "Incluir ícones" está marcado) do ícone padrão de
+    # telefone para o ícone de WhatsApp — mas nunca desenha uma linha extra
+    # nem move o texto do Telefone, que continua sempre na mesma posição.
     phone_is_whatsapp = BooleanField("Este telefone também é o WhatsApp", default=False)
     unit = StringField(
         "Unidade / Gerência",

@@ -184,6 +184,7 @@ def render_signature(
     jpeg_quality: int = 88,
     variant: str = "sem_foto",
     with_icons: bool = False,
+    phone_is_whatsapp: bool = False,
 ) -> None:
     """Gera a imagem final da assinatura e salva em output_path.
 
@@ -196,6 +197,9 @@ def render_signature(
     - with_icons: se True, desenha um ícone antes de e-mail/telefone/whatsapp
       (só quando o campo estiver alinhado à esquerda — os únicos casos usados
       hoje pelos padrões FIEG 2026)
+    - phone_is_whatsapp: se True, o ícone desenhado antes do campo "phone" é o
+      de WhatsApp em vez do ícone padrão de telefone (o texto/posição do
+      campo não mudam — só o ícone). Não tem efeito se with_icons for False.
     """
     variant = normalize_variant(variant)
     defaults = DEFAULTS_BY_VARIANT[variant]
@@ -234,7 +238,11 @@ def render_signature(
         # Ícone (opcional): só para e-mail/telefone/whatsapp alinhados à
         # esquerda — reserva espaço à esquerda do texto para o ícone caber
         # sem sobrepor, encolhendo a largura disponível para o texto.
-        icon_drawer = _ICON_DRAWERS.get(field_key) if (with_icons and align == "left") else None
+        # O campo "phone" usa o ícone de WhatsApp em vez do ícone padrão de
+        # telefone quando phone_is_whatsapp está marcado — só troca o ícone,
+        # nunca o texto/posição (ver docstring acima).
+        icon_key = "whatsapp" if (field_key == "phone" and phone_is_whatsapp) else field_key
+        icon_drawer = _ICON_DRAWERS.get(icon_key) if (with_icons and align == "left") else None
         icon_reserved = 0
         icon_size = 0
         if icon_drawer:

@@ -212,6 +212,7 @@ def new_signature():
                 jpeg_quality=current_app.config["JPEG_QUALITY"],
                 variant=variant,
                 with_icons=with_icons,
+                phone_is_whatsapp=phone_is_whatsapp,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")
