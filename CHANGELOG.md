@@ -2,6 +2,24 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.7.2] — 2026-08-13
+
+### Removido
+
+- **QR Code do WhatsApp removido de "Gerar assinatura"**: o upload de imagem de QR Code (introduzido na v2.7.0, ajustado na v2.7.1) foi retirado por completo — não aparece mais campo de upload, nada é composto na imagem final, e a coluna `qrcode_filename` foi removida do banco de dados.
+
+### Corrigido
+
+- **Deslocamento do texto do Telefone ao marcar "Este telefone também é o WhatsApp"**: a correção de duplicação da v2.7.1 apagava o texto de "Telefone" e reaproveitava a posição de "WhatsApp" no modelo, o que fazia o número "pular" de lugar na imagem ao marcar/desmarcar a opção. Agora o campo Telefone é sempre desenhado na sua posição normal, sem exceção — marcar "Este telefone também é o WhatsApp" só grava essa informação no registro (para fins de auditoria/busca), sem alterar em nada a imagem gerada nem a pré-visualização.
+
+### Alterado (mudança de banco)
+
+- Coluna `qrcode_filename` removida de `signature_records`. Requer reset do volume em instalações que já rodaram a v2.7.0/2.7.1:
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
+
 ## [2.7.1] — 2026-08-13
 
 ### Corrigido

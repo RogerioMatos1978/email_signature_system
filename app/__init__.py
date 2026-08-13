@@ -60,7 +60,7 @@ def _configure_logging(app):
 
 
 def _ensure_directories(app):
-    for key in ("INSTANCE_DIR", "TEMPLATES_UPLOAD_DIR", "PHOTOS_UPLOAD_DIR", "GENERATED_UPLOAD_DIR", "QRCODES_UPLOAD_DIR"):
+    for key in ("INSTANCE_DIR", "TEMPLATES_UPLOAD_DIR", "PHOTOS_UPLOAD_DIR", "GENERATED_UPLOAD_DIR"):
         path = app.config[key]
         os.makedirs(path, exist_ok=True)
 

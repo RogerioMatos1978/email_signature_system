@@ -35,9 +35,8 @@
         <label class="editor-panel__checkbox field__label">
           {{ form.phone_is_whatsapp(id="phone_is_whatsapp") }} {{ form.phone_is_whatsapp.label.text }}
         </label>
-        <p class="field__help">Marque para este número também aparecer como WhatsApp na assinatura (sem precisar digitar de novo).</p>
+        <p class="field__help">Só marca o registro para fins de auditoria — não altera o texto do telefone na imagem.</p>
       </div>
-      {{ fh.file_field(form.whatsapp_qrcode, "PNG ou JPG, máx. 5MB — inserido em 36x36px na frente do número de WhatsApp na assinatura. Só aparece se \"" ~ form.phone_is_whatsapp.label.text ~ "\" estiver marcado.") }}
 
       <div class="field">
         <label class="editor-panel__checkbox field__label">

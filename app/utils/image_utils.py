@@ -1,8 +1,7 @@
 """Composição server-side da imagem final da assinatura.
 
-Combina: imagem de fundo (definida pelo admin) + campos de texto do usuário +
-QR Code do WhatsApp (opcional), gerando um único PNG/JPG pronto para ser
-usado como assinatura no Outlook.
+Combina: imagem de fundo (definida pelo admin) + campos de texto do usuário,
+gerando um único PNG/JPG pronto para ser usado como assinatura no Outlook.
 """
 import os
 from typing import Optional
@@ -173,12 +172,6 @@ _ICON_DRAWERS = {
     "whatsapp": _draw_whatsapp_icon,
 }
 
-# QR Code do WhatsApp (opcional, só na geração individual — "Gerar
-# assinatura"; nunca disponível na importação de planilha): dimensão fixa
-# pedida explicitamente (36x36px, "vertical-align: middle"), ao contrário dos
-# ícones procedurais acima, cujo tamanho acompanha o tamanho da fonte.
-WHATSAPP_QR_SIZE = 36
-
 
 def render_signature(
     background_path: str,
@@ -191,8 +184,6 @@ def render_signature(
     jpeg_quality: int = 88,
     variant: str = "sem_foto",
     with_icons: bool = False,
-    qrcode_path: Optional[str] = None,
-    whatsapp_icon_enabled: bool = True,
 ) -> None:
     """Gera a imagem final da assinatura e salva em output_path.
 
@@ -205,16 +196,6 @@ def render_signature(
     - with_icons: se True, desenha um ícone antes de e-mail/telefone/whatsapp
       (só quando o campo estiver alinhado à esquerda — os únicos casos usados
       hoje pelos padrões FIEG 2026)
-    - qrcode_path: caminho absoluto de um QR Code (imagem enviada pelo próprio
-      usuário) a inserir em 36x36px na frente do número de WhatsApp — quando
-      presente, substitui o ícone de WhatsApp procedural só nesse campo
-      (e-mail/telefone continuam com o ícone normal, se with_icons também
-      estiver marcado). Só usado pela geração individual.
-    - whatsapp_icon_enabled: se False, o ícone procedural de WhatsApp NUNCA é
-      desenhado (mesmo com with_icons=True e sem QR Code) — usado pela
-      geração individual, que deixou de oferecer esse ícone automático (só
-      mostra algo antes do número quando um QR Code é enviado). A importação
-      em lote continua com o comportamento antigo (não passa este parâmetro).
     """
     variant = normalize_variant(variant)
     defaults = DEFAULTS_BY_VARIANT[variant]
@@ -250,36 +231,13 @@ def render_signature(
         align = cfg.get("align", "left")
         color = cfg.get("color") or "#1f2937"
 
-        # QR Code do WhatsApp (opcional, 36x36 fixo): quando enviado, substitui
-        # o ícone procedural só no campo "whatsapp" — e-mail/telefone
-        # continuam com o ícone normal (ver with_icons abaixo).
-        use_qr = (
-            field_key == "whatsapp"
-            and qrcode_path
-            and os.path.isfile(qrcode_path)
-            and align == "left"
-        )
-        # Ícone procedural de WhatsApp: só quando NÃO há QR Code e
-        # whatsapp_icon_enabled não foi explicitamente desligado (ver
-        # docstring — a geração individual desliga isso desde que passou a
-        # oferecer só QR-Code-ou-nada para esse campo específico).
-        whatsapp_icon_ok = field_key != "whatsapp" or whatsapp_icon_enabled
-
         # Ícone (opcional): só para e-mail/telefone/whatsapp alinhados à
         # esquerda — reserva espaço à esquerda do texto para o ícone caber
         # sem sobrepor, encolhendo a largura disponível para o texto.
-        icon_drawer = (
-            None
-            if (use_qr or not whatsapp_icon_ok)
-            else (_ICON_DRAWERS.get(field_key) if (with_icons and align == "left") else None)
-        )
+        icon_drawer = _ICON_DRAWERS.get(field_key) if (with_icons and align == "left") else None
         icon_reserved = 0
         icon_size = 0
-        if use_qr:
-            icon_size = WHATSAPP_QR_SIZE
-            icon_reserved = icon_size + max(4, int(icon_size * 0.4))
-            max_box_width = max(20, max_box_width - icon_reserved)
-        elif icon_drawer:
+        if icon_drawer:
             icon_size = max(10, int(float(cfg.get("font_size", 18)) * 0.82))
             icon_reserved = icon_size + max(4, int(icon_size * 0.4))
             max_box_width = max(20, max_box_width - icon_reserved)
@@ -295,27 +253,10 @@ def render_signature(
                 text_x = int(x - text_w / 2)
             else:
                 text_x = int(x - text_w)
-        elif icon_drawer or use_qr:
+        elif icon_drawer:
             text_x = x + icon_reserved
 
-        if use_qr:
-            try:
-                qr_img = Image.open(qrcode_path).convert("RGBA")
-                qr_img = ImageOps.fit(qr_img, (icon_size, icon_size), Image.LANCZOS, centering=(0.5, 0.5))
-                # "vertical-align: middle" real: centraliza o QR em relação à
-                # altura visual do TEXTO (não do próprio ícone) — o texto é
-                # desenhado a partir do topo "y" com âncora "la" do PIL, então
-                # o centro visual da linha fica perto de y + font_size*0.4.
-                # Usar o tamanho fixo do QR (36px) direto na fórmula antiga
-                # (pensada para ícones pequenos, escalados a partir da fonte)
-                # deslocava o QR para baixo demais, "cortando" a base dele
-                # contra a linha seguinte — daí o posicionamento corrigido.
-                text_center_y = y + float(cfg.get("font_size", 18)) * 0.4
-                qr_top = int(text_center_y - icon_size / 2)
-                base.alpha_composite(qr_img, dest=(max(0, x), max(0, qr_top)))
-            except Exception:  # noqa: BLE001 — QR Code corrompido/ilegível nunca deve derrubar a geração da assinatura
-                pass
-        elif icon_drawer:
+        if icon_drawer:
             icon_img = icon_drawer(icon_size, color)
             icon_y = y + int(icon_size * 0.18)  # aproxima o centro do ícone da altura-x do texto
             base.alpha_composite(icon_img, dest=(max(0, x), max(0, icon_y)))

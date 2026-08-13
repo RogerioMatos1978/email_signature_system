@@ -168,15 +168,10 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="Telefone inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
+    # Só marca o número de Telefone também como WhatsApp para fins de
+    # registro/auditoria — não desenha uma linha extra na imagem (o texto do
+    # Telefone continua sempre na mesma posição, nunca se desloca).
     phone_is_whatsapp = BooleanField("Este telefone também é o WhatsApp", default=False)
-    whatsapp_qrcode = FileField(
-        "QR Code do WhatsApp (opcional)",
-        validators=[
-            Optional(),
-            FileAllowed(["png", "jpg", "jpeg"], "Envie apenas arquivos PNG ou JPG."),
-            FileSize(max_size=MAX_IMAGE_BYTES, message="A imagem deve ter no máximo 5MB."),
-        ],
-    )
     unit = StringField(
         "Unidade / Gerência",
         validators=[
@@ -185,7 +180,7 @@ class SignatureForm(FlaskForm):
             no_control_chars,
         ],
     )
-    with_icons = BooleanField("Incluir ícones antes do e-mail, telefone e WhatsApp", default=False)
+    with_icons = BooleanField("Incluir ícones antes do e-mail e do telefone", default=False)
     with_photo = BooleanField("Gerar assinatura com foto", default=False)
     photo = FileField(
         "Foto do colaborador",

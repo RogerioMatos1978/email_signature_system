@@ -170,13 +170,12 @@ def new_signature():
             )
 
         phone_value = sanitize_plain_text(form.phone.data, 40)
-        # O campo separado "WhatsApp (opcional)" foi removido — a única forma
-        # de ter um número de WhatsApp na assinatura agora é marcar "Este
-        # telefone também é o WhatsApp", que reaproveita o número já digitado
-        # no Telefone (só disponível na geração individual, nunca na
-        # importação de planilha, que mantém seu próprio fluxo inalterado).
+        # "Este telefone também é o WhatsApp" é só uma marcação para o
+        # registro/auditoria (SignatureRecord.whatsapp) — a IMAGEM nunca
+        # desenha uma linha separada de WhatsApp na geração individual, então
+        # marcar essa opção não move nem duplica nenhum texto na assinatura;
+        # o telefone continua sempre na mesma posição de sempre.
         phone_is_whatsapp = bool(form.phone_is_whatsapp.data)
-        whatsapp_value = phone_value if phone_is_whatsapp else ""
 
         values = {
             "full_name": sanitize_plain_text(form.full_name.data, 80),
@@ -184,31 +183,12 @@ def new_signature():
             "unit": sanitize_plain_text(form.unit.data, 60),
             "signature_email": sanitize_plain_text(form.signature_email.data, 190),
             "phone": phone_value,
-            "whatsapp": whatsapp_value,
+            # Nunca preenchido para a IMAGEM: "whatsapp" fica de fora do
+            # dicionário passado a render_signature (ver abaixo) — só entra
+            # no registro do banco.
+            "whatsapp": "",
         }
         with_icons = bool(form.with_icons.data)
-
-        # QR Code do WhatsApp (opcional, 36x36px na frente do número) — só
-        # existe se houver de fato um número de WhatsApp para acompanhar.
-        qrcode_filename = None
-        if values["whatsapp"] and form.whatsapp_qrcode.data and form.whatsapp_qrcode.data.filename:
-            try:
-                qr_img = validate_and_open_image(
-                    form.whatsapp_qrcode.data,
-                    current_app.config["MAX_IMAGE_UPLOAD_BYTES"],
-                    current_app.config["MAX_IMAGE_DIMENSION"],
-                )
-            except ImageValidationError as exc:
-                flash(f"QR Code do WhatsApp: {exc}", "error")
-                return render_template("user/new_signature.html", form=form, templates=templates, has_any_template=True)
-
-            from PIL import ImageOps as _ImageOps
-
-            qr_img = _ImageOps.exif_transpose(qr_img)
-            qrcode_filename = generate_safe_filename("png")
-            qr_img.convert("RGBA").save(
-                os.path.join(current_app.config["QRCODES_UPLOAD_DIR"], qrcode_filename), "PNG", optimize=True
-            )
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
         output_filename = generate_safe_filename(output_format)
@@ -216,28 +196,15 @@ def new_signature():
         photo_path = (
             os.path.join(current_app.config["PHOTOS_UPLOAD_DIR"], photo_filename) if photo_filename else None
         )
-        qrcode_path = (
-            os.path.join(current_app.config["QRCODES_UPLOAD_DIR"], qrcode_filename) if qrcode_filename else None
-        )
         background_path = os.path.join(
             current_app.config["TEMPLATES_UPLOAD_DIR"], active_template.background_filename
         )
-
-        # Evita duplicar o mesmo número na assinatura (uma vez como
-        # "Telefone", outra como "WhatsApp"): quando o telefone está marcado
-        # como WhatsApp, a linha de Telefone não é desenhada — o número
-        # aparece só uma vez, na linha de WhatsApp (com QR Code, se enviado).
-        # O registro no banco (values/record) continua com o telefone
-        # completo, só a IMAGEM gerada omite a linha redundante.
-        render_values = dict(values)
-        if phone_is_whatsapp:
-            render_values["phone"] = ""
 
         try:
             render_signature(
                 background_path=background_path,
                 fields_config=active_template.get_fields(),
-                values=render_values,
+                values=values,
                 photo_path=photo_path,
                 output_path=output_path,
                 output_format=output_format,
@@ -245,8 +212,6 @@ def new_signature():
                 jpeg_quality=current_app.config["JPEG_QUALITY"],
                 variant=variant,
                 with_icons=with_icons,
-                qrcode_path=qrcode_path,
-                whatsapp_icon_enabled=False,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")
@@ -260,11 +225,10 @@ def new_signature():
             unit=values["unit"],
             signature_email=values["signature_email"],
             phone=values["phone"],
-            whatsapp=values["whatsapp"] or None,
+            whatsapp=(phone_value if phone_is_whatsapp else None),
             with_icons=with_icons,
             source="individual",
             photo_filename=photo_filename,
-            qrcode_filename=qrcode_filename,
             output_filename=output_filename,
             output_format=output_format,
             status="pending",
