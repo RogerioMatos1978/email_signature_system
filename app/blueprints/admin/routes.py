@@ -17,7 +17,7 @@ from PIL import ImageOps
 
 from ...extensions import db
 from ...decorators import admin_required, roles_required
-from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm
+from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm, CpfImportForm
 from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog, ImportJob
 from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
 from ...utils.template_fields import validate_fields_json, TemplateFieldsError
@@ -280,12 +280,20 @@ def user_new():
     temp_password = None
 
     if form.validate_on_submit():
-        username = form.username.data.strip().lower()
+        # Para "Usuário padrão", validate_username (em forms.py) já normalizou
+        # o campo para os 11 dígitos do CPF — mantém exatamente esse valor.
+        # Para Supervisor/Administrador, continua o cadastro livre de sempre.
+        is_cpf_user = form.role.data == Role.USER.value
+        username = form.username.data if is_cpf_user else form.username.data.strip().lower()
         if User.query.filter_by(username=username).first():
-            flash("Já existe um usuário cadastrado com este nome de usuário.", "error")
+            message = (
+                "Já existe um usuário cadastrado com este CPF."
+                if is_cpf_user
+                else "Já existe um usuário cadastrado com este nome de usuário."
+            )
+            flash(message, "error")
             return render_template("admin/user_form.html", form=form, user=None, temp_password=None)
 
-        temp_password = _generate_temp_password()
         user = User(
             name=form.name.data.strip(),
             username=username,
@@ -293,6 +301,21 @@ def user_new():
             is_active_flag=True,
             must_change_password=True,
         )
+
+        if is_cpf_user:
+            # Login e senha inicial são o próprio CPF — sem chave de acesso
+            # aleatória para copiar/guardar (o CPF já é conhecido por todos).
+            user.set_password(username)
+            db.session.add(user)
+            db.session.commit()
+            flash(
+                f'Usuário padrão "{user.name}" criado com sucesso. Login e senha inicial: '
+                f"CPF {username} (somente números). Ele(a) precisará trocar a senha no primeiro acesso.",
+                "success",
+            )
+            return render_template("admin/user_form.html", form=UserCreateForm(formdata=None), user=None, temp_password=None)
+
+        temp_password = _generate_temp_password()
         user.set_password(temp_password)
         db.session.add(user)
         db.session.commit()
@@ -415,6 +438,128 @@ def user_delete(user_id):
     db.session.commit()
     flash("Usuário excluído.", "info")
     return redirect(url_for("admin.users_list"))
+
+
+# ---------------------------------------------------------------------------
+# Importação de CPFs (cria contas de Usuário padrão — login e senha = CPF)
+# ---------------------------------------------------------------------------
+
+# Cabeçalhos aceitos para a planilha de CPFs (comparação sem acentos/maiúsculas).
+_CPF_IMPORT_COLUMNS = {
+    "nome": "name",
+    "nome completo": "name",
+    "colaborador": "name",
+    "cpf": "cpf",
+}
+_CPF_IMPORT_CONTAINS_RULES = (
+    ("cpf", "cpf"),
+    ("nome", "name"),
+)
+_CPF_IMPORT_LABELS = {"name": "Nome", "cpf": "CPF"}
+
+
+def _match_cpf_column(normalized_header: str):
+    field = _CPF_IMPORT_COLUMNS.get(normalized_header)
+    if field:
+        return field
+    for needle, mapped_field in _CPF_IMPORT_CONTAINS_RULES:
+        if needle in normalized_header:
+            return mapped_field
+    return None
+
+
+def _map_cpf_columns(header_row):
+    mapping = {}
+    for idx, cell in enumerate(header_row):
+        field = _match_cpf_column(_normalize_header(cell))
+        if field and field not in mapping.values():
+            mapping[idx] = field
+    missing = [f for f in ("name", "cpf") if f not in mapping.values()]
+    if missing:
+        raise ValueError(
+            "Colunas obrigatórias não encontradas na planilha: "
+            + ", ".join(_CPF_IMPORT_LABELS[f] for f in missing)
+            + ". Use o cabeçalho: Nome; CPF."
+        )
+    return mapping
+
+
+@admin_bp.route("/usuarios/importar-cpf", methods=["GET", "POST"])
+@admin_required
+def users_import_cpf():
+    """Importação em lote de CPFs: cria uma conta de Usuário padrão para cada
+    linha da planilha — login e senha iniciais são o próprio CPF (só
+    números, sem chave de acesso aleatória para copiar/guardar). Diferente de
+    "Importar planilha" (Admin/Supervisor, gera assinaturas em lote sem criar
+    conta nenhuma): esta tela cria CONTAS DE ACESSO ao sistema, por isso é
+    restrita ao Administrador, como o restante do cadastro de usuários."""
+    form = CpfImportForm()
+    created = []
+    errors = []
+
+    if form.validate_on_submit():
+        try:
+            header, data_rows = _read_spreadsheet_rows(form.spreadsheet.data)
+            mapping = _map_cpf_columns(header)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
+
+        if len(data_rows) > 500:
+            flash("A planilha tem mais de 500 linhas. Divida em arquivos menores.", "error")
+            return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
+
+        seen_cpfs = set()
+        for line_no, row in enumerate(data_rows, start=2):  # linha 1 = cabeçalho
+            values = {
+                field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
+                for idx, field in mapping.items()
+            }
+            name = (values.get("name") or "").strip()
+            cpf = re.sub(r"\D", "", values.get("cpf") or "")
+
+            if not name or len(name) < 2:
+                errors.append(f"Linha {line_no}: nome inválido ou vazio.")
+                continue
+            if len(cpf) != 11:
+                errors.append(f"Linha {line_no}: CPF inválido (deve ter 11 dígitos) — \"{values.get('cpf', '')}\".")
+                continue
+            if cpf in seen_cpfs:
+                errors.append(f"Linha {line_no}: CPF {cpf} duplicado nesta planilha.")
+                continue
+            if User.query.filter_by(username=cpf).first():
+                errors.append(f"Linha {line_no}: CPF {cpf} já cadastrado no sistema.")
+                continue
+
+            seen_cpfs.add(cpf)
+            user = User(
+                name=name[:120],
+                username=cpf,
+                role=Role.USER.value,
+                is_active_flag=True,
+                must_change_password=True,
+            )
+            user.set_password(cpf)
+            db.session.add(user)
+            created.append(name)
+
+        if created:
+            db.session.commit()
+            flash(
+                f"{len(created)} usuário(s) padrão criado(s) com sucesso. Login e senha inicial de cada um: o próprio CPF.",
+                "success",
+            )
+        else:
+            db.session.rollback()
+            flash("Nenhum usuário foi criado. Corrija os erros da planilha e tente novamente.", "error")
+
+        return render_template(
+            "admin/user_import_cpf.html", form=CpfImportForm(formdata=None), created=created, errors=errors
+        )
+
+    if form.is_submitted():
+        flash_form_errors(form)
+    return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
 
 
 # ---------------------------------------------------------------------------

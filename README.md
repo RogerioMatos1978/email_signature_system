@@ -67,6 +67,15 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 > projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
 > tratadas como comprometidas e trocadas.
 
+> **Atualizando de uma instalação anterior à v2.6.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidade: login por CPF para
+> Usuário padrão — nova tela **Admin → Usuários → Importar CPFs** cria contas em
+> lote a partir de uma planilha (Nome; CPF), com login e senha inicial iguais
+> ao CPF; "Novo usuário" também aceita CPF quando o perfil é "Usuário padrão"
+> (Supervisor/Administrador continuam com usuário livre e senha temporária, sem
+> mudança). A busca pública em "Como inserir sua assinatura no Outlook" passa a
+> aceitar CPF além do nome.
+>
 > **Atualizando de uma instalação anterior à v2.5.1?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Ajuste de layout: os cards
 > do painel se distribuem melhor no espaço disponível em telas largas (não

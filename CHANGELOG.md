@@ -2,6 +2,16 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.6.0] — 2026-08-13
+
+### Adicionado
+
+- **Login por CPF para Usuário padrão.** Nova tela **Admin → Usuários → Importar CPFs** (só Administrador): sobe uma planilha (Nome; CPF) e cria uma conta de Usuário padrão para cada linha — login e senha inicial de cada conta são o próprio CPF (somente números; aceita CPF digitado com ou sem pontuação na planilha, mas grava só os dígitos). CPFs duplicados (na própria planilha ou já cadastrados no sistema) são rejeitados e listados no resultado, sem interromper as demais linhas.
+- **Admin → Usuários → Novo usuário** também passa a aceitar CPF quando o perfil escolhido é "Usuário padrão": o campo "Usuário" exige um CPF de 11 dígitos e a senha inicial da conta passa a ser o próprio CPF — a tela deixa de mostrar a senha temporária aleatória ("chave de acesso") nesse caso, já que a senha já é conhecida (o CPF). Para os perfis Supervisor e Administrador, nada muda: continuam com usuário livre e senha temporária aleatória gerada pelo sistema, como sempre foi.
+- **Busca pública por CPF**: na página "Como inserir sua assinatura no Outlook" (`/ajuda/outlook`), o campo de busca (sem login) passa a aceitar também o CPF do colaborador (somente números), além do nome — encontra a assinatura gerada pela própria conta CPF do usuário. Continua funcionando exatamente como antes para busca por nome.
+
+Sem mudança de banco de dados (usa as colunas já existentes de `users`).
+
 ## [2.5.1] — 2026-08-13
 
 ### Corrigido

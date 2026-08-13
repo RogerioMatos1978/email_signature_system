@@ -40,15 +40,15 @@
 
 <div class="card card--tip">
   <h2>Buscar minha assinatura (sem precisar de login)</h2>
-  <p class="muted">Já geraram sua assinatura (individualmente ou em uma importação de planilha)? Digite seu nome completo abaixo para localizá-la e baixar — sem precisar de usuário ou senha.</p>
+  <p class="muted">Já geraram sua assinatura (individualmente ou em uma importação de planilha)? Digite seu nome completo ou seu CPF (somente números) abaixo para localizá-la e baixar — sem precisar de usuário ou senha.</p>
   <form method="get" class="public-search__form">
-    <input type="text" name="nome" value="{{ query_name }}" placeholder="Digite seu nome completo" minlength="{{ min_chars }}" maxlength="120" class="field__input" autocomplete="off">
+    <input type="text" name="nome" value="{{ query_name }}" placeholder="Digite seu nome completo ou CPF" minlength="{{ min_chars }}" maxlength="120" class="field__input" autocomplete="off">
     <button type="submit" class="btn btn--primary">{{ icons.search("icon") }}<span>Buscar</span></button>
   </form>
 
   {% if searched %}
     {% if matches|length == 0 %}
-      <p class="muted mt-1">Nenhuma assinatura encontrada para "{{ query_name }}". Confira a digitação do nome ou peça ao Supervisor/Administrador para verificar se ela já foi gerada.</p>
+      <p class="muted mt-1">Nenhuma assinatura encontrada para "{{ query_name }}". Confira a digitação do nome (ou do CPF) ou peça ao Supervisor/Administrador para verificar se ela já foi gerada.</p>
     {% else %}
       {% set available = matches | selectattr('is_publicly_available') | list %}
       {% set downloaded = matches | rejectattr('is_publicly_available') | sort(attribute='public_downloaded_at', reverse=True) | list %}

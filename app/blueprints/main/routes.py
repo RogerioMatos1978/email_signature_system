@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from flask import Blueprint, redirect, url_for, render_template, current_app, abort, request, flash
@@ -30,13 +31,23 @@ def index():
     return redirect(url_for("user.dashboard"))
 
 
-def _search_public_signatures(query_name: str):
-    """Busca (sem login) por assinaturas já geradas com nome parecido, tolerante
-    a acento/caixa. Carrega um teto de registros recentes e filtra em Python —
-    suficiente para a escala de uma organização (centenas/poucos milhares de
-    colaboradores); evita depender de extensão de "unaccent" no SQLite."""
-    norm_query = normalize_search_text(query_name)
-    if len(norm_query) < PUBLIC_SEARCH_MIN_CHARS:
+def _search_public_signatures(query_term: str):
+    """Busca (sem login) por assinaturas já geradas — aceita tanto o NOME
+    (parcial, tolerante a acento/caixa, comportamento de sempre) quanto o CPF
+    (11 dígitos, com ou sem pontuação) de quem gerou a própria assinatura.
+    O CPF só é comparado com o login (username) do dono do registro quando a
+    assinatura foi gerada individualmente (source == "individual") — é o
+    caso dos usuários padrão cadastrados por CPF (login e senha = CPF); não
+    se aplica a assinaturas de importação de planilha (sem conta associada
+    ao colaborador). Carrega um teto de registros recentes e filtra em
+    Python — suficiente para a escala de uma organização (centenas/poucos
+    milhares de colaboradores); evita depender de extensão de "unaccent" no
+    SQLite."""
+    norm_query = normalize_search_text(query_term)
+    cpf_query = re.sub(r"\D", "", query_term or "")
+    name_ok = len(norm_query) >= PUBLIC_SEARCH_MIN_CHARS
+    cpf_ok = len(cpf_query) == 11
+    if not name_ok and not cpf_ok:
         return []
     candidates = (
         SignatureRecord.query.filter(SignatureRecord.status == "success")
@@ -44,7 +55,11 @@ def _search_public_signatures(query_name: str):
         .limit(PUBLIC_SEARCH_SCAN_LIMIT)
         .all()
     )
-    matches = [r for r in candidates if norm_query in normalize_search_text(r.full_name)]
+    matches = [
+        r for r in candidates
+        if (name_ok and norm_query in normalize_search_text(r.full_name))
+        or (cpf_ok and r.source == "individual" and r.user and r.user.username == cpf_query)
+    ]
     return matches[:PUBLIC_SEARCH_MAX_RESULTS]
 
 

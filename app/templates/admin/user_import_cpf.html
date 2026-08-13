@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% import "_form_helpers.html" as fh %}
+{% import "_back_button.html" as back_btn %}
+{% block title %}Importar CPFs{% endblock %}
+{% block content %}
+{{ back_btn.back(url_for('admin.users_list')) }}
+<div class="page-header">
+  <h1>Importar CPFs</h1>
+  <p class="muted">Crie contas de <strong>Usuário padrão</strong> em lote a partir de uma planilha de CPFs — o login e a senha inicial de cada conta são o próprio CPF (somente números).</p>
+</div>
+
+<div class="signature-layout">
+  <div class="card">
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {{ form.hidden_tag() }}
+      {{ fh.file_field(form.spreadsheet, "Formatos aceitos: .xlsx ou .csv (máx. 2MB, até 500 linhas).") }}
+      <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
+    </form>
+  </div>
+
+  <div class="card card--tip">
+    <h2>Formato esperado da planilha</h2>
+    <p class="muted">A primeira linha deve ser o cabeçalho, com estas colunas (a ordem não importa; acentos e maiúsculas são ignorados):</p>
+    <div class="table-wrap mt-05">
+      <table class="table">
+        <thead><tr><th>Nome</th><th>CPF</th></tr></thead>
+        <tbody>
+          <tr><td>Maria da Silva</td><td>123.456.789-00</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="field__help mt-05">O CPF pode ser digitado com ou sem pontuação — só os números são usados. Cada CPF deve ser único: CPFs repetidos na planilha ou já cadastrados no sistema são ignorados e listados no resultado. Toda conta criada é do perfil <strong>Usuário padrão</strong>, com login e senha inicial iguais ao CPF; o usuário precisará trocar a senha no primeiro acesso.</p>
+  </div>
+</div>
+
+{% if created %}
+<div class="card mt-1-5">
+  <h2>{{ created|length }} usuário(s) criado(s)</h2>
+  <ul class="steps">
+    {% for name in created %}<li>{{ name }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if errors %}
+<div class="card card--tip mt-1-5">
+  <h2>{{ errors|length }} linha(s) com erro</h2>
+  <ul class="steps">
+    {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}
