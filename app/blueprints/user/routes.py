@@ -169,21 +169,56 @@ def new_signature():
                 os.path.join(current_app.config["PHOTOS_UPLOAD_DIR"], photo_filename), "PNG", optimize=True
             )
 
+        phone_value = sanitize_plain_text(form.phone.data, 40)
+        # "Este telefone também é o WhatsApp": reaproveita o número já
+        # digitado no Telefone, sem precisar redigitar no campo separado —
+        # tem prioridade sobre o campo "WhatsApp (opcional)" quando marcado
+        # (só disponível na geração individual, nunca na importação de planilha).
+        if form.phone_is_whatsapp.data:
+            whatsapp_value = phone_value
+        else:
+            whatsapp_value = sanitize_plain_text(form.whatsapp.data, 40) if form.whatsapp.data else ""
+
         values = {
             "full_name": sanitize_plain_text(form.full_name.data, 80),
             "role_title": sanitize_plain_text(form.role_title.data, 60),
             "unit": sanitize_plain_text(form.unit.data, 60),
             "signature_email": sanitize_plain_text(form.signature_email.data, 190),
-            "phone": sanitize_plain_text(form.phone.data, 40),
-            "whatsapp": sanitize_plain_text(form.whatsapp.data, 40) if form.whatsapp.data else "",
+            "phone": phone_value,
+            "whatsapp": whatsapp_value,
         }
         with_icons = bool(form.with_icons.data)
+
+        # QR Code do WhatsApp (opcional, 32x32px na frente do número) — só
+        # existe se houver de fato um número de WhatsApp para acompanhar.
+        qrcode_filename = None
+        if values["whatsapp"] and form.whatsapp_qrcode.data and form.whatsapp_qrcode.data.filename:
+            try:
+                qr_img = validate_and_open_image(
+                    form.whatsapp_qrcode.data,
+                    current_app.config["MAX_IMAGE_UPLOAD_BYTES"],
+                    current_app.config["MAX_IMAGE_DIMENSION"],
+                )
+            except ImageValidationError as exc:
+                flash(f"QR Code do WhatsApp: {exc}", "error")
+                return render_template("user/new_signature.html", form=form, templates=templates, has_any_template=True)
+
+            from PIL import ImageOps as _ImageOps
+
+            qr_img = _ImageOps.exif_transpose(qr_img)
+            qrcode_filename = generate_safe_filename("png")
+            qr_img.convert("RGBA").save(
+                os.path.join(current_app.config["QRCODES_UPLOAD_DIR"], qrcode_filename), "PNG", optimize=True
+            )
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
         output_filename = generate_safe_filename(output_format)
         output_path = os.path.join(current_app.config["GENERATED_UPLOAD_DIR"], output_filename)
         photo_path = (
             os.path.join(current_app.config["PHOTOS_UPLOAD_DIR"], photo_filename) if photo_filename else None
+        )
+        qrcode_path = (
+            os.path.join(current_app.config["QRCODES_UPLOAD_DIR"], qrcode_filename) if qrcode_filename else None
         )
         background_path = os.path.join(
             current_app.config["TEMPLATES_UPLOAD_DIR"], active_template.background_filename
@@ -201,6 +236,7 @@ def new_signature():
                 jpeg_quality=current_app.config["JPEG_QUALITY"],
                 variant=variant,
                 with_icons=with_icons,
+                qrcode_path=qrcode_path,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")
@@ -218,6 +254,7 @@ def new_signature():
             with_icons=with_icons,
             source="individual",
             photo_filename=photo_filename,
+            qrcode_filename=qrcode_filename,
             output_filename=output_filename,
             output_format=output_format,
             status="pending",

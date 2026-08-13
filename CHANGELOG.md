@@ -2,6 +2,21 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.7.0] — 2026-08-13
+
+### Adicionado
+
+- **QR Code do WhatsApp em "Gerar assinatura"** (só na geração individual — não disponível na importação de planilha): novo upload opcional de imagem de QR Code, inserida em **32x32px** imediatamente antes do número de WhatsApp na assinatura, no lugar do ícone de WhatsApp desenhado pelo sistema (quando "Incluir ícones" também está marcado).
+- **Campo Telefone ganhou a opção "Este telefone também é o WhatsApp"** (só em "Gerar assinatura"): ao marcar, o número já digitado em Telefone passa a ser usado também como WhatsApp na assinatura, sem precisar redigitar no campo separado "WhatsApp (opcional)" — que continua existindo para quem tiver um número diferente.
+
+### Alterado (mudança de banco)
+
+- `signature_records` ganhou a coluna `qrcode_filename` (sempre vazia para assinaturas geradas por importação de planilha). Requer reset do volume em instalações existentes:
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
+
 ## [2.6.0] — 2026-08-13
 
 ### Adicionado

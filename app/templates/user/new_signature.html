@@ -30,7 +30,14 @@
       {{ fh.field(form.unit) }}
       {{ fh.field(form.signature_email) }}
       {{ fh.field(form.phone, "Ex.: (62) 91234-5678") }}
-      {{ fh.field(form.whatsapp, "Ex.: (62) 91234-5678 — deixe em branco se não usar um segundo telefone.") }}
+
+      <div class="field">
+        <label class="editor-panel__checkbox field__label">
+          {{ form.phone_is_whatsapp(id="phone_is_whatsapp") }} {{ form.phone_is_whatsapp.label.text }}
+        </label>
+      </div>
+      {{ fh.file_field(form.whatsapp_qrcode, "PNG ou JPG, máx. 5MB — inserido em 32x32px na frente do número de WhatsApp na assinatura. Só aparece se houver um número de WhatsApp (deste telefone ou do campo abaixo).") }}
+      {{ fh.field(form.whatsapp, "Ex.: (62) 91234-5678 — ignorado se \"" ~ form.phone_is_whatsapp.label.text ~ "\" estiver marcado. Deixe em branco se não usar um segundo telefone.") }}
 
       <div class="field">
         <label class="editor-panel__checkbox field__label">

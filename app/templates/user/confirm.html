@@ -17,7 +17,7 @@
       <dt>Unidade / Gerência</dt><dd>{{ record.unit }}</dd>
       <dt>E-mail</dt><dd>{{ record.signature_email }}</dd>
       <dt>Telefone</dt><dd>{{ record.phone }}</dd>
-      {% if record.whatsapp %}<dt>WhatsApp</dt><dd>{{ record.whatsapp }}</dd>{% endif %}
+      {% if record.whatsapp %}<dt>WhatsApp</dt><dd>{{ record.whatsapp }}{% if record.qrcode_filename %} <span class="badge badge--active">com QR Code</span>{% endif %}</dd>{% endif %}
       <dt>Ícones</dt><dd>{{ "Sim" if record.with_icons else "Não" }}</dd>
       <dt>Foto</dt><dd>{{ "Com foto" if record.photo_filename else "Sem foto" }}</dd>
       <dt>Formato de saída</dt><dd>{{ record.output_format | upper }}</dd>

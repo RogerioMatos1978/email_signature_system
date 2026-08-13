@@ -19,6 +19,7 @@ def delete_record_files(record) -> None:
     for folder_key, filename in (
         ("GENERATED_UPLOAD_DIR", record.output_filename),
         ("PHOTOS_UPLOAD_DIR", record.photo_filename),
+        ("QRCODES_UPLOAD_DIR", record.qrcode_filename),
     ):
         if not filename:
             continue

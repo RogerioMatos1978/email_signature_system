@@ -153,6 +153,12 @@ class SignatureRecord(db.Model):
     source = db.Column(db.String(20), nullable=False, default="individual", index=True)
 
     photo_filename = db.Column(db.String(255), nullable=True)  # foto do colaborador (variante com_foto)
+    # QR Code do WhatsApp (opcional) — só disponível na geração individual
+    # ("Gerar assinatura"), nunca na importação de planilha (ver
+    # user/routes.py `new_signature` e admin/routes.py `_run_batch_import_job`,
+    # que nunca preenche este campo). Inserido em 32x32px na frente do número
+    # de WhatsApp, no lugar do ícone procedural de WhatsApp quando presente.
+    qrcode_filename = db.Column(db.String(255), nullable=True)
     output_filename = db.Column(db.String(255), nullable=False)
     output_format = db.Column(db.String(4), nullable=False)  # png | jpg
     status = db.Column(db.String(20), nullable=False, default="success", index=True)

@@ -67,6 +67,17 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 > projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
 > tratadas como comprometidas e trocadas.
 
+> **Atualizando de uma instalação anterior à v2.7.0?** Muda o banco (nova
+> coluna `qrcode_filename` em `signature_records`) — é preciso resetar o
+> volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidades (só em "Gerar assinatura", não na importação de planilha): upload
+> opcional de QR Code do WhatsApp (32x32px, inserido antes do número) e opção
+> "Este telefone também é o WhatsApp" no campo Telefone.
+>
 > **Atualizando de uma instalação anterior à v2.6.0?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Novidade: login por CPF para
 > Usuário padrão — nova tela **Admin → Usuários → Importar CPFs** cria contas em

@@ -20,6 +20,9 @@ class Config:
     TEMPLATES_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "templates")
     PHOTOS_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "photos")
     GENERATED_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "generated")
+    # QR Code do WhatsApp (opcional, só na geração individual — ver "Gerar
+    # assinatura"): inserido em 32x32px na frente do número de WhatsApp.
+    QRCODES_UPLOAD_DIR = os.path.join(UPLOAD_DIR, "qrcodes")
 
     # Limite rígido de tamanho de requisição (defesa contra upload abusivo/DoS)
     MAX_CONTENT_LENGTH = 6 * 1024 * 1024  # 6 MB por requisição
@@ -61,7 +64,7 @@ class Config:
     OUTPUT_MAX_WIDTH = int(os.environ.get("OUTPUT_MAX_WIDTH", 1300))
     JPEG_QUALITY = int(os.environ.get("JPEG_QUALITY", 88))
 
-    APP_VERSION = "2.6.0"
+    APP_VERSION = "2.7.0"
 
 
 class DevelopmentConfig(Config):

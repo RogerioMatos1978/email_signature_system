@@ -168,6 +168,15 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="Telefone inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
+    phone_is_whatsapp = BooleanField("Este telefone também é o WhatsApp", default=False)
+    whatsapp_qrcode = FileField(
+        "QR Code do WhatsApp (opcional)",
+        validators=[
+            Optional(),
+            FileAllowed(["png", "jpg", "jpeg"], "Envie apenas arquivos PNG ou JPG."),
+            FileSize(max_size=MAX_IMAGE_BYTES, message="A imagem deve ter no máximo 5MB."),
+        ],
+    )
     whatsapp = StringField(
         "WhatsApp (opcional)",
         validators=[
