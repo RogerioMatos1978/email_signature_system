@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Assinaturas de E-mail{% endblock %} · Sistema de Assinaturas de E-mail</title>
 <meta name="csrf-token" content="{{ csrf_token() }}">
+{# Favicon gerado localmente (PIL, sem depender de serviço externo) com as
+   cores oficiais da marca: azul-marinho #0B4390 -> azul FIEG #008BD2, com um
+   envelope branco — os mesmos ícones de e-mail/telefone/WhatsApp usados no
+   sistema (menu e assinatura gerada) seguem essa mesma linguagem visual. #}
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='img/favicon.ico') }}">
+<link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32x32.png') }}">
+<link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16x16.png') }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 {# Síncrono de propósito (sem defer/async): precisa rodar ANTES do <body>
    pintar, para não haver flash de tema claro em quem já escolheu escuro.
@@ -15,10 +23,11 @@
 <body>
 {% import "_icons.html" as icons %}
 {% macro theme_toggle_btn(cls) %}
-<button type="button" class="theme-toggle {{ cls }}" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">
-  <span class="theme-toggle__icon theme-toggle__icon--sun">{{ icons.sun() }}</span>
-  <span class="theme-toggle__icon theme-toggle__icon--moon">{{ icons.moon() }}</span>
-</button>
+<div class="theme-switch {{ cls }}" role="group" aria-label="Tema do site">
+  <button type="button" class="theme-switch__btn" data-theme-choice="light" aria-label="Tema branco" title="Tema branco">{{ icons.sun() }}</button>
+  <button type="button" class="theme-switch__btn" data-theme-choice="dark" aria-label="Tema preto" title="Tema preto">{{ icons.moon() }}</button>
+  <button type="button" class="theme-switch__btn" data-theme-choice="signature" aria-label="Tema cor da assinatura" title="Tema cor da assinatura">{{ icons.droplet() }}</button>
+</div>
 {% endmacro %}
 
 {# O bloco de conteúdo ({% block content %}) só pode aparecer UMA vez no
@@ -60,7 +69,7 @@
 
     <div class="sidebar__footer">
       <a href="{{ url_for('auth.logout') }}" class="nav__link nav__link--logout">{{ icons.logout() }}<span>Sair</span></a>
-      {{ theme_toggle_btn("theme-toggle--inline") }}
+      {{ theme_toggle_btn("theme-switch--inline") }}
     </div>
   </aside>
 
@@ -74,7 +83,7 @@
       </div>
     </header>
 {% else %}
-  {{ theme_toggle_btn("theme-toggle--floating") }}
+  {{ theme_toggle_btn("theme-switch--floating") }}
 {% endif %}
 
     <main class="page">

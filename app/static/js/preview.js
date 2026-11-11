@@ -35,13 +35,16 @@
   });
 
   var form = document.getElementById("signatureForm");
+  // Não há campo "WhatsApp" na pré-visualização: "Este telefone também é o
+  // WhatsApp" é só uma marcação para auditoria (ver forms.py) — não desenha
+  // nada extra nem move o texto do Telefone, então não precisa de nenhum
+  // tratamento especial aqui.
   var fieldMap = {
     full_name: form.querySelector("#full_name"),
     role_title: form.querySelector("#role_title"),
     unit: form.querySelector("#unit"),
     signature_email: form.querySelector("#signature_email"),
     phone: form.querySelector("#phone"),
-    whatsapp: form.querySelector("#whatsapp"),
   };
   var photoInput = form.querySelector("#photo");
   var withPhotoCheckbox = form.querySelector("#with_photo");
@@ -139,7 +142,7 @@
     ctx.drawImage(bg.img, 0, 0, canvas.width, canvas.height);
 
     var fields = variant.fields || {};
-    ["full_name", "role_title", "unit", "signature_email", "phone", "whatsapp"].forEach(function (key) {
+    ["full_name", "role_title", "unit", "signature_email", "phone"].forEach(function (key) {
       drawField(key, fields[key] || {});
     });
 

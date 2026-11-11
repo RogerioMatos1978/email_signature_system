@@ -126,6 +126,13 @@ class SignatureRecord(db.Model):
 
     __tablename__ = "signature_records"
 
+    # Nº de downloads permitidos pelo portal público para assinaturas geradas
+    # via importação de planilha (colaboradores tipicamente SEM conta de
+    # usuário no sistema, ao contrário da geração individual). Depois do
+    # último download permitido, o registro é apagado — ver
+    # main.public_download.
+    PUBLIC_BATCH_DOWNLOAD_LIMIT = 4
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     template_id = db.Column(db.Integer, db.ForeignKey("signature_templates.id"), nullable=True)
@@ -138,19 +145,31 @@ class SignatureRecord(db.Model):
     whatsapp = db.Column(db.String(40), nullable=True)  # segundo telefone (WhatsApp), opcional
     with_icons = db.Column(db.Boolean, nullable=False, default=False)  # ícones antes de e-mail/telefone/whatsapp
 
+    # "individual" (gerada uma a uma — autoatendimento do usuário padrão, ou
+    # Admin/Supervisor gerando para alguém específico) | "batch" (veio de uma
+    # importação de planilha — tipicamente colaboradores SEM conta de usuário
+    # cadastrada no sistema). Essa distinção define a regra de download pelo
+    # portal público (ver `is_publicly_available`).
+    source = db.Column(db.String(20), nullable=False, default="individual", index=True)
+
     photo_filename = db.Column(db.String(255), nullable=True)  # foto do colaborador (variante com_foto)
     output_filename = db.Column(db.String(255), nullable=False)
     output_format = db.Column(db.String(4), nullable=False)  # png | jpg
     status = db.Column(db.String(20), nullable=False, default="success", index=True)
 
-    # Portal público (sem login) de autoatendimento: o colaborador busca pelo
-    # próprio nome e baixa a assinatura já gerada UMA vez. Depois disso este
-    # campo é preenchido e o registro some da busca pública — para baixar de
-    # novo, precisa pedir ao Supervisor/Administrador (que sempre podem baixar
-    # via Auditoria, sem essa trava). Independente de `can_generate_signature`
-    # (que é por USUÁRIO logado); este é por REGISTRO, então não interfere em
-    # nenhum fluxo existente.
+    # Portal público (sem login) de autoatendimento — regra de disponibilidade
+    # depende de `source` (ver `is_publicly_available`):
+    # - "individual": pode baixar só UMA vez; depois disso `public_downloaded_at`
+    #   fica preenchido e, para baixar de novo, é preciso pedir ao
+    #   Supervisor/Administrador (que sempre podem, via Auditoria).
+    # - "batch": pode baixar até PUBLIC_BATCH_DOWNLOAD_LIMIT vezes (contador em
+    #   `public_download_count`); ao atingir o limite, o registro é apagado —
+    #   não tem trava de "pedir para o Supervisor", só precisa reimportar a
+    #   planilha quando for necessário de novo.
+    # Independente de `can_generate_signature` (que é por USUÁRIO logado);
+    # isto é por REGISTRO, então não interfere em nenhum fluxo existente.
     public_downloaded_at = db.Column(db.DateTime, nullable=True)
+    public_download_count = db.Column(db.Integer, nullable=False, default=0)
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
@@ -159,6 +178,22 @@ class SignatureRecord(db.Model):
     __table_args__ = (
         db.Index("ix_signature_records_user_created", "user_id", "created_at"),
     )
+
+    @property
+    def is_publicly_available(self) -> bool:
+        """True se ainda pode ser baixada pelo portal público (sem login)."""
+        if self.source == "batch":
+            return self.public_download_count < self.PUBLIC_BATCH_DOWNLOAD_LIMIT
+        return self.public_downloaded_at is None
+
+    @property
+    def public_downloads_remaining(self):
+        """Quantos downloads públicos ainda restam — só faz sentido para
+        `source == "batch"` (o "individual" é tudo ou nada); None nos outros
+        casos, para o template não mostrar um número sem sentido."""
+        if self.source != "batch":
+            return None
+        return max(0, self.PUBLIC_BATCH_DOWNLOAD_LIMIT - self.public_download_count)
 
     def __repr__(self):
         return f"<SignatureRecord user_id={self.user_id} format={self.output_format}>"
@@ -186,3 +221,40 @@ class PublicAccessLog(db.Model):
 
     def __repr__(self):
         return f"<PublicAccessLog action={self.action!r} name={self.searched_name!r}>"
+
+
+class ImportJob(db.Model):
+    """Job de importação em lote rodando em segundo plano (thread), para a
+    barra de progresso da tela de Importar planilha. É persistido no BANCO
+    (não em um dicionário em memória) porque a aplicação roda com múltiplos
+    processos Gunicorn (ver entrypoint.sh, --workers): o processo que recebe
+    a requisição de progresso (polling via JavaScript) pode não ser o mesmo
+    processo que criou o job e está rodando a thread — um dicionário em
+    memória só existiria dentro de UM processo."""
+
+    __tablename__ = "import_jobs"
+
+    id = db.Column(db.String(32), primary_key=True)  # secrets.token_hex(16)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False, default="running", index=True)  # running|done|error
+    total = db.Column(db.Integer, nullable=False, default=0)
+    processed = db.Column(db.Integer, nullable=False, default=0)
+    generated = db.Column(db.Integer, nullable=False, default=0)
+    errors_json = db.Column(db.Text, nullable=False, default="[]")
+    zip_name = db.Column(db.String(255), nullable=True)
+    error_message = db.Column(db.String(500), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def get_errors(self) -> list:
+        try:
+            data = json.loads(self.errors_json) if self.errors_json else []
+            return data if isinstance(data, list) else []
+        except (ValueError, TypeError):
+            return []
+
+    def set_errors(self, errors) -> None:
+        self.errors_json = json.dumps(list(errors or []))
+
+    def __repr__(self):
+        return f"<ImportJob {self.id} status={self.status!r} {self.processed}/{self.total}>"

@@ -30,7 +30,13 @@
       {{ fh.field(form.unit) }}
       {{ fh.field(form.signature_email) }}
       {{ fh.field(form.phone, "Ex.: (62) 91234-5678") }}
-      {{ fh.field(form.whatsapp, "Ex.: (62) 91234-5678 — deixe em branco se não usar um segundo telefone.") }}
+
+      <div class="field">
+        <label class="editor-panel__checkbox field__label">
+          {{ form.phone_is_whatsapp(id="phone_is_whatsapp") }} {{ form.phone_is_whatsapp.label.text }}
+        </label>
+        <p class="field__help">Não altera o texto do telefone na imagem — só troca o ícone (quando "Incluir ícones" estiver marcado) e grava a informação no registro para auditoria/busca.</p>
+      </div>
 
       <div class="field">
         <label class="editor-panel__checkbox field__label">

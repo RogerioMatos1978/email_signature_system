@@ -169,13 +169,24 @@ def new_signature():
                 os.path.join(current_app.config["PHOTOS_UPLOAD_DIR"], photo_filename), "PNG", optimize=True
             )
 
+        phone_value = sanitize_plain_text(form.phone.data, 40)
+        # "Este telefone também é o WhatsApp" é só uma marcação para o
+        # registro/auditoria (SignatureRecord.whatsapp) — a IMAGEM nunca
+        # desenha uma linha separada de WhatsApp na geração individual, então
+        # marcar essa opção não move nem duplica nenhum texto na assinatura;
+        # o telefone continua sempre na mesma posição de sempre.
+        phone_is_whatsapp = bool(form.phone_is_whatsapp.data)
+
         values = {
             "full_name": sanitize_plain_text(form.full_name.data, 80),
             "role_title": sanitize_plain_text(form.role_title.data, 60),
             "unit": sanitize_plain_text(form.unit.data, 60),
             "signature_email": sanitize_plain_text(form.signature_email.data, 190),
-            "phone": sanitize_plain_text(form.phone.data, 40),
-            "whatsapp": sanitize_plain_text(form.whatsapp.data, 40) if form.whatsapp.data else "",
+            "phone": phone_value,
+            # Nunca preenchido para a IMAGEM: "whatsapp" fica de fora do
+            # dicionário passado a render_signature (ver abaixo) — só entra
+            # no registro do banco.
+            "whatsapp": "",
         }
         with_icons = bool(form.with_icons.data)
 
@@ -201,6 +212,7 @@ def new_signature():
                 jpeg_quality=current_app.config["JPEG_QUALITY"],
                 variant=variant,
                 with_icons=with_icons,
+                phone_is_whatsapp=phone_is_whatsapp,
             )
         except SignatureRenderError as exc:
             flash(str(exc), "error")
@@ -214,8 +226,9 @@ def new_signature():
             unit=values["unit"],
             signature_email=values["signature_email"],
             phone=values["phone"],
-            whatsapp=values["whatsapp"] or None,
+            whatsapp=(phone_value if phone_is_whatsapp else None),
             with_icons=with_icons,
+            source="individual",
             photo_filename=photo_filename,
             output_filename=output_filename,
             output_format=output_format,

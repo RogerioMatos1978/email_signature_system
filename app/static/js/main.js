@@ -40,22 +40,30 @@
     }, 6000);
   });
 
-  // Alternador de tema claro/escuro — o tema já foi aplicado antes da
-  // renderização (script inline no <head>, evita "flash" de tema errado);
-  // aqui só cuidamos do clique e de persistir a escolha em localStorage.
+  // Seletor de tema (3 opções: Branco / Preto / Cor da assinatura) — o tema
+  // já foi aplicado antes da renderização (script em theme-init.js no
+  // <head>, evita "flash" de tema errado); aqui só cuidamos do clique nos
+  // botões, de marcar o ativo e de persistir a escolha em localStorage.
   var root = document.documentElement;
   function setTheme(theme) {
-    if (theme === "dark") {
-      root.setAttribute("data-theme", "dark");
+    if (theme === "dark" || theme === "signature") {
+      root.setAttribute("data-theme", theme);
     } else {
       root.removeAttribute("data-theme");
+      theme = "light";
     }
     try { localStorage.setItem("theme", theme); } catch (e) { /* modo privado etc. */ }
+    markActiveThemeButtons(theme);
   }
-  document.querySelectorAll(".theme-toggle").forEach(function (btn) {
+  function markActiveThemeButtons(theme) {
+    document.querySelectorAll(".theme-switch__btn").forEach(function (btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-theme-choice") === theme);
+    });
+  }
+  document.querySelectorAll(".theme-switch__btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
-      var isDark = root.getAttribute("data-theme") === "dark";
-      setTheme(isDark ? "light" : "dark");
+      setTheme(btn.getAttribute("data-theme-choice"));
     });
   });
+  markActiveThemeButtons(root.getAttribute("data-theme") || "light");
 })();

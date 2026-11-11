@@ -35,14 +35,6 @@ TEXT_FIELD_KEYS = ("full_name", "role_title", "unit", "signature_email", "phone"
 VARIANTS = ("sem_foto", "com_foto")
 VARIANT_LABELS = {"sem_foto": "Sem foto", "com_foto": "Com foto"}
 
-# Unidade / Gerência (v2.0.0): deixou de ser texto livre e virou uma lista
-# fixa de opções — hoje só "UI Rio Verde - Sesi Senai", mas a lista está
-# pronta para receber mais unidades no futuro (basta adicionar tuplas aqui).
-UNIT_CHOICES = [
-    ("UI Rio Verde - Sesi Senai", "UI Rio Verde - Sesi Senai"),
-]
-DEFAULT_UNIT = UNIT_CHOICES[0][0]
-
 _AZUL_FIEG = "#008BD2"
 _BRANCO = "#FFFFFF"
 

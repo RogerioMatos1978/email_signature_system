@@ -13,7 +13,7 @@
 
     <form method="post" novalidate>
       {{ form.hidden_tag() }}
-      {{ fh.field(form.username, autocomplete="username") }}
+      {{ fh.field(form.username, "Usuário padrão: use seu CPF (somente números). Supervisor/Administrador: use o usuário cadastrado.", autocomplete="username") }}
       {{ fh.field(form.password, autocomplete="current-password") }}
       <button type="submit" class="btn btn--primary btn--block">{{ form.submit.label.text }}</button>
     </form>

@@ -82,6 +82,36 @@ def generate_safe_filename(extension: str) -> str:
     return f"{uuid.uuid4().hex}.{ext}"
 
 
+def is_valid_cpf(digits: str) -> bool:
+    """Valida um CPF (só dígitos, 11 caracteres) pelos dígitos verificadores
+    oficiais (mod 11) — usada onde o CPF vira login/senha (Novo Usuário e
+    Importar CPFs), para recusar CPFs com formato certo mas inválidos (ex.:
+    digitados errado) e sequências óbvias como "00000000000"/"11111111111".
+
+    Recebe só os dígitos (sem pontuação) e não levanta exceção: retorna
+    False para qualquer entrada que não seja um CPF válido.
+    """
+    digits = "".join(ch for ch in str(digits or "") if ch.isdigit())
+    if len(digits) != 11:
+        return False
+    if digits == digits[0] * 11:
+        return False
+
+    def _check_digit(cpf_partial: str) -> int:
+        weight = len(cpf_partial) + 1
+        total = sum(int(d) * (weight - i) for i, d in enumerate(cpf_partial))
+        remainder = (total * 10) % 11
+        return 0 if remainder == 10 else remainder
+
+    first = _check_digit(digits[:9])
+    if first != int(digits[9]):
+        return False
+    second = _check_digit(digits[:10])
+    if second != int(digits[10]):
+        return False
+    return True
+
+
 PHONE_ALLOWED_CHARS = set("0123456789()+- ")
 
 

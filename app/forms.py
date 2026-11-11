@@ -1,3 +1,5 @@
+import re
+
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed, FileSize
 from wtforms import (
@@ -18,11 +20,12 @@ from wtforms.validators import (
     ValidationError,
 )
 
-from .utils.template_fields import UNIT_CHOICES
+from .utils.validators import is_valid_cpf
 
 PHONE_REGEX = r"^[0-9()+\-\s]{8,20}$"
 USERNAME_REGEX = r"^[A-Za-z0-9_.\-]{3,80}$"
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+_NON_DIGITS_RE = re.compile(r"\D+")
 
 
 def no_control_chars(_form, field):
@@ -75,6 +78,23 @@ class UserCreateForm(FlaskForm):
         validators=[DataRequired()],
     )
     submit = SubmitField("Criar usuário")
+
+    def validate_username(self, field):
+        """Para o perfil "Usuário padrão", o login passa a ser o CPF (só
+        números) — aceita o CPF digitado com ou sem pontuação, mas normaliza
+        para dígitos antes de salvar (é isso que vira username e senha
+        inicial da conta). Perfis Supervisor/Administrador continuam com o
+        cadastro de usuário livre de sempre, sem nenhuma mudança."""
+        if self.role.data != "user":
+            return
+        digits = _NON_DIGITS_RE.sub("", field.data or "")
+        if len(digits) != 11:
+            raise ValidationError(
+                'Para o perfil "Usuário padrão", o campo Usuário deve ser o CPF com 11 dígitos (somente números).'
+            )
+        if not is_valid_cpf(digits):
+            raise ValidationError("CPF inválido. Confira os números digitados.")
+        field.data = digits
 
 
 class UserEditForm(FlaskForm):
@@ -152,19 +172,21 @@ class SignatureForm(FlaskForm):
             Regexp(PHONE_REGEX, message="Telefone inválido. Use apenas números, espaços, parênteses, + e -."),
         ],
     )
-    whatsapp = StringField(
-        "WhatsApp (opcional)",
+    # Marca o número de Telefone também como WhatsApp: grava o valor no
+    # registro para fins de auditoria/busca E troca o ícone desenhado antes
+    # do campo (quando "Incluir ícones" está marcado) do ícone padrão de
+    # telefone para o ícone de WhatsApp — mas nunca desenha uma linha extra
+    # nem move o texto do Telefone, que continua sempre na mesma posição.
+    phone_is_whatsapp = BooleanField("Este telefone também é o WhatsApp", default=False)
+    unit = StringField(
+        "Unidade / Gerência",
         validators=[
-            Optional(),
-            Regexp(PHONE_REGEX, message="WhatsApp inválido. Use apenas números, espaços, parênteses, + e -."),
+            DataRequired(message="Informe a unidade / gerência."),
+            Length(min=2, max=45, message="A unidade / gerência deve ter entre 2 e 45 caracteres."),
+            no_control_chars,
         ],
     )
-    unit = SelectField(
-        "Unidade / Gerência",
-        choices=UNIT_CHOICES,
-        validators=[DataRequired(message="Selecione a unidade / gerência.")],
-    )
-    with_icons = BooleanField("Incluir ícones antes do e-mail, telefone e WhatsApp", default=False)
+    with_icons = BooleanField("Incluir ícones antes do e-mail e do telefone", default=False)
     with_photo = BooleanField("Gerar assinatura com foto", default=False)
     photo = FileField(
         "Foto do colaborador",
@@ -210,3 +232,20 @@ class BatchImportForm(FlaskForm):
     # salva no modelo ativo — nunca bloqueia o envio da planilha.
     fields_json = HiddenField("Posicionamento dos campos", validators=[Optional()])
     submit = SubmitField("Importar e gerar assinaturas")
+
+
+class CpfImportForm(FlaskForm):
+    """Importação em lote de CPFs: cria uma conta de Usuário padrão para cada
+    linha (Nome + CPF) — login e senha iniciais são o próprio CPF (só
+    números). Diferente de BatchImportForm: aqui o resultado é uma CONTA DE
+    ACESSO ao sistema, não uma imagem de assinatura."""
+
+    spreadsheet = FileField(
+        "Planilha de CPFs (.xlsx ou .csv)",
+        validators=[
+            DataRequired(message="Envie a planilha."),
+            FileAllowed(["xlsx", "csv"], "Envie um arquivo .xlsx ou .csv."),
+            FileSize(max_size=2 * 1024 * 1024, message="A planilha deve ter no máximo 2MB."),
+        ],
+    )
+    submit = SubmitField("Importar CPFs")

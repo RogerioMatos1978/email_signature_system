@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 from flask import Blueprint, redirect, url_for, render_template, current_app, abort, request, flash
@@ -8,6 +9,7 @@ from ...extensions import db, limiter
 from ...models import SignatureTemplate, SignatureRecord, PublicAccessLog
 from ...utils.security import safe_send_file
 from ...utils.validators import normalize_search_text
+from ...utils.files import delete_record_files
 
 main_bp = Blueprint("main", __name__)
 
@@ -29,13 +31,23 @@ def index():
     return redirect(url_for("user.dashboard"))
 
 
-def _search_public_signatures(query_name: str):
-    """Busca (sem login) por assinaturas já geradas com nome parecido, tolerante
-    a acento/caixa. Carrega um teto de registros recentes e filtra em Python —
-    suficiente para a escala de uma organização (centenas/poucos milhares de
-    colaboradores); evita depender de extensão de "unaccent" no SQLite."""
-    norm_query = normalize_search_text(query_name)
-    if len(norm_query) < PUBLIC_SEARCH_MIN_CHARS:
+def _search_public_signatures(query_term: str):
+    """Busca (sem login) por assinaturas já geradas — aceita tanto o NOME
+    (parcial, tolerante a acento/caixa, comportamento de sempre) quanto o CPF
+    (11 dígitos, com ou sem pontuação) de quem gerou a própria assinatura.
+    O CPF só é comparado com o login (username) do dono do registro quando a
+    assinatura foi gerada individualmente (source == "individual") — é o
+    caso dos usuários padrão cadastrados por CPF (login e senha = CPF); não
+    se aplica a assinaturas de importação de planilha (sem conta associada
+    ao colaborador). Carrega um teto de registros recentes e filtra em
+    Python — suficiente para a escala de uma organização (centenas/poucos
+    milhares de colaboradores); evita depender de extensão de "unaccent" no
+    SQLite."""
+    norm_query = normalize_search_text(query_term)
+    cpf_query = re.sub(r"\D", "", query_term or "")
+    name_ok = len(norm_query) >= PUBLIC_SEARCH_MIN_CHARS
+    cpf_ok = len(cpf_query) == 11
+    if not name_ok and not cpf_ok:
         return []
     candidates = (
         SignatureRecord.query.filter(SignatureRecord.status == "success")
@@ -43,7 +55,11 @@ def _search_public_signatures(query_name: str):
         .limit(PUBLIC_SEARCH_SCAN_LIMIT)
         .all()
     )
-    matches = [r for r in candidates if norm_query in normalize_search_text(r.full_name)]
+    matches = [
+        r for r in candidates
+        if (name_ok and norm_query in normalize_search_text(r.full_name))
+        or (cpf_ok and r.source == "individual" and r.user and r.user.username == cpf_query)
+    ]
     return matches[:PUBLIC_SEARCH_MAX_RESULTS]
 
 
@@ -81,23 +97,28 @@ def outlook_help():
 @main_bp.route("/ajuda/outlook/baixar/<int:record_id>", methods=["POST"])
 @limiter.limit("20 per minute", key_func=get_remote_address)
 def public_download(record_id):
-    """Download único (sem login) de uma assinatura já gerada. Consome a
-    disponibilidade pública do registro — depois disso só Supervisor ou
-    Administrador conseguem baixá-la de novo (via Auditoria) e reenviar por
-    WhatsApp. Não afeta em nada os outros fluxos de download do sistema."""
+    """Download (sem login) de uma assinatura já gerada — a regra de
+    disponibilidade depende de como a assinatura foi gerada (ver
+    SignatureRecord.is_publicly_available):
+    - Gerada individualmente: download único; depois disso só Supervisor ou
+      Administrador conseguem baixá-la de novo (via Auditoria) e reenviar por
+      WhatsApp.
+    - Gerada por importação de planilha (colaborador tipicamente sem conta de
+      usuário cadastrada): permite até PUBLIC_BATCH_DOWNLOAD_LIMIT downloads;
+      ao atingir o limite, o registro é apagado — sem trava de "peça ao
+      Supervisor", basta reimportar a planilha quando precisar de novo."""
     record = SignatureRecord.query.get_or_404(record_id)
-    if record.status != "success":
-        abort(404)
-
-    if record.public_downloaded_at is not None:
+    if record.status != "success" or not record.is_publicly_available:
         flash(
-            "Esta assinatura já foi baixada pelo portal público anteriormente. "
+            "Esta assinatura não está mais disponível para download pelo portal público. "
             "Solicite ao Supervisor ou Administrador que baixe e envie por WhatsApp.",
             "error",
         )
         return redirect(url_for("main.outlook_help", nome=record.full_name))
 
     record.public_downloaded_at = datetime.utcnow()
+    if record.source == "batch":
+        record.public_download_count += 1
     db.session.add(PublicAccessLog(
         action="download",
         searched_name=record.full_name,
@@ -107,9 +128,21 @@ def public_download(record_id):
     db.session.commit()
 
     download_name = f"assinatura-{record.full_name.replace(' ', '_')}.{record.output_format}"
-    return safe_send_file(
+    response = safe_send_file(
         current_app.config["GENERATED_UPLOAD_DIR"], record.output_filename, download_name=download_name
     )
+
+    # Regra nova (v2.2.0): assinaturas de lote esgotaram o limite de
+    # downloads públicos — apaga o registro e o arquivo. O sistema operacional
+    # já abriu o arquivo para enviar a resposta acima (o send_file mantém o
+    # descritor aberto durante o envio), então remover o arquivo agora não
+    # interrompe este download: só impede novos.
+    if record.source == "batch" and record.public_download_count >= SignatureRecord.PUBLIC_BATCH_DOWNLOAD_LIMIT:
+        delete_record_files(record)
+        db.session.delete(record)
+        db.session.commit()
+
+    return response
 
 
 @main_bp.route("/modelo/fundo/<int:template_id>")

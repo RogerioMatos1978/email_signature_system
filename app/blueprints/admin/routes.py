@@ -5,20 +5,22 @@ import os
 import re
 import secrets
 import string
+import threading
 import unicodedata
 import zipfile
+from datetime import datetime, timedelta
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from PIL import ImageOps
 
 from ...extensions import db
 from ...decorators import admin_required, roles_required
-from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm
-from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog
-from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text
-from ...utils.template_fields import validate_fields_json, TemplateFieldsError, DEFAULT_UNIT
+from ...forms import TemplateForm, UserCreateForm, UserEditForm, BatchImportForm, CpfImportForm
+from ...models import User, Role, SignatureTemplate, SignatureRecord, PublicAccessLog, ImportJob
+from ...utils.validators import validate_and_open_image, generate_safe_filename, ImageValidationError, sanitize_plain_text, is_valid_cpf
+from ...utils.template_fields import validate_fields_json, TemplateFieldsError
 from ...utils.image_utils import render_signature, SignatureRenderError
 from ...utils.security import safe_send_file
 from ...utils.flashing import flash_form_errors
@@ -278,12 +280,20 @@ def user_new():
     temp_password = None
 
     if form.validate_on_submit():
-        username = form.username.data.strip().lower()
+        # Para "Usuário padrão", validate_username (em forms.py) já normalizou
+        # o campo para os 11 dígitos do CPF — mantém exatamente esse valor.
+        # Para Supervisor/Administrador, continua o cadastro livre de sempre.
+        is_cpf_user = form.role.data == Role.USER.value
+        username = form.username.data if is_cpf_user else form.username.data.strip().lower()
         if User.query.filter_by(username=username).first():
-            flash("Já existe um usuário cadastrado com este nome de usuário.", "error")
+            message = (
+                "Já existe um usuário cadastrado com este CPF."
+                if is_cpf_user
+                else "Já existe um usuário cadastrado com este nome de usuário."
+            )
+            flash(message, "error")
             return render_template("admin/user_form.html", form=form, user=None, temp_password=None)
 
-        temp_password = _generate_temp_password()
         user = User(
             name=form.name.data.strip(),
             username=username,
@@ -291,11 +301,31 @@ def user_new():
             is_active_flag=True,
             must_change_password=True,
         )
+
+        if is_cpf_user:
+            # Login e senha inicial são o próprio CPF — sem chave de acesso
+            # aleatória para copiar/guardar (o CPF já é conhecido por todos).
+            user.set_password(username)
+            db.session.add(user)
+            db.session.commit()
+            flash(
+                f'Usuário padrão "{user.name}" criado com sucesso. Login e senha inicial: '
+                f"CPF {username} (somente números). A troca de senha é opcional — ele(a) pode "
+                "trocar quando quiser em \"Minha conta\".",
+                "success",
+            )
+            return render_template("admin/user_form.html", form=UserCreateForm(formdata=None), user=None, temp_password=None)
+
+        temp_password = _generate_temp_password()
         user.set_password(temp_password)
         db.session.add(user)
         db.session.commit()
 
-        flash("Usuário criado com sucesso. Copie a senha temporária abaixo — ela não será exibida novamente.", "success")
+        flash(
+            "Usuário criado com sucesso. Copie a senha temporária abaixo — ela não será exibida "
+            "novamente. A troca de senha é opcional.",
+            "success",
+        )
         return render_template("admin/user_form.html", form=UserCreateForm(formdata=None), user=user, temp_password=temp_password)
 
     if form.is_submitted():
@@ -416,13 +446,136 @@ def user_delete(user_id):
 
 
 # ---------------------------------------------------------------------------
+# Importação de CPFs (cria contas de Usuário padrão — login e senha = CPF)
+# ---------------------------------------------------------------------------
+
+# Cabeçalhos aceitos para a planilha de CPFs (comparação sem acentos/maiúsculas).
+_CPF_IMPORT_COLUMNS = {
+    "nome": "name",
+    "nome completo": "name",
+    "colaborador": "name",
+    "cpf": "cpf",
+}
+_CPF_IMPORT_CONTAINS_RULES = (
+    ("cpf", "cpf"),
+    ("nome", "name"),
+)
+_CPF_IMPORT_LABELS = {"name": "Nome", "cpf": "CPF"}
+
+
+def _match_cpf_column(normalized_header: str):
+    field = _CPF_IMPORT_COLUMNS.get(normalized_header)
+    if field:
+        return field
+    for needle, mapped_field in _CPF_IMPORT_CONTAINS_RULES:
+        if needle in normalized_header:
+            return mapped_field
+    return None
+
+
+def _map_cpf_columns(header_row):
+    mapping = {}
+    for idx, cell in enumerate(header_row):
+        field = _match_cpf_column(_normalize_header(cell))
+        if field and field not in mapping.values():
+            mapping[idx] = field
+    missing = [f for f in ("name", "cpf") if f not in mapping.values()]
+    if missing:
+        raise ValueError(
+            "Colunas obrigatórias não encontradas na planilha: "
+            + ", ".join(_CPF_IMPORT_LABELS[f] for f in missing)
+            + ". Use o cabeçalho: Nome; CPF."
+        )
+    return mapping
+
+
+@admin_bp.route("/usuarios/importar-cpf", methods=["GET", "POST"])
+@admin_required
+def users_import_cpf():
+    """Importação em lote de CPFs: cria uma conta de Usuário padrão para cada
+    linha da planilha — login e senha iniciais são o próprio CPF (só
+    números, sem chave de acesso aleatória para copiar/guardar). Diferente de
+    "Importar planilha" (Admin/Supervisor, gera assinaturas em lote sem criar
+    conta nenhuma): esta tela cria CONTAS DE ACESSO ao sistema, por isso é
+    restrita ao Administrador, como o restante do cadastro de usuários."""
+    form = CpfImportForm()
+    created = []
+    errors = []
+
+    if form.validate_on_submit():
+        try:
+            header, data_rows = _read_spreadsheet_rows(form.spreadsheet.data)
+            mapping = _map_cpf_columns(header)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
+
+        if len(data_rows) > 500:
+            flash("A planilha tem mais de 500 linhas. Divida em arquivos menores.", "error")
+            return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
+
+        seen_cpfs = set()
+        for line_no, row in enumerate(data_rows, start=2):  # linha 1 = cabeçalho
+            values = {
+                field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
+                for idx, field in mapping.items()
+            }
+            name = (values.get("name") or "").strip()
+            cpf = re.sub(r"\D", "", values.get("cpf") or "")
+
+            if not name or len(name) < 2:
+                errors.append(f"Linha {line_no}: nome inválido ou vazio.")
+                continue
+            if len(cpf) != 11:
+                errors.append(f"Linha {line_no}: CPF inválido (deve ter 11 dígitos) — \"{values.get('cpf', '')}\".")
+                continue
+            if not is_valid_cpf(cpf):
+                errors.append(f"Linha {line_no}: CPF inválido (dígitos verificadores não conferem) — \"{values.get('cpf', '')}\".")
+                continue
+            if cpf in seen_cpfs:
+                errors.append(f"Linha {line_no}: CPF {cpf} duplicado nesta planilha.")
+                continue
+            if User.query.filter_by(username=cpf).first():
+                errors.append(f"Linha {line_no}: CPF {cpf} já cadastrado no sistema.")
+                continue
+
+            seen_cpfs.add(cpf)
+            user = User(
+                name=name[:120],
+                username=cpf,
+                role=Role.USER.value,
+                is_active_flag=True,
+                must_change_password=True,
+            )
+            user.set_password(cpf)
+            db.session.add(user)
+            created.append(name)
+
+        if created:
+            db.session.commit()
+            flash(
+                f"{len(created)} usuário(s) padrão criado(s) com sucesso. Login e senha inicial de "
+                "cada um: o próprio CPF. A troca de senha é opcional.",
+                "success",
+            )
+        else:
+            db.session.rollback()
+            flash("Nenhum usuário foi criado. Corrija os erros da planilha e tente novamente.", "error")
+
+        return render_template(
+            "admin/user_import_cpf.html", form=CpfImportForm(formdata=None), created=created, errors=errors
+        )
+
+    if form.is_submitted():
+        flash_form_errors(form)
+    return render_template("admin/user_import_cpf.html", form=form, created=created, errors=errors)
+
+
+# ---------------------------------------------------------------------------
 # Importação em lote (planilha) — assinaturas SEM FOTO
 # ---------------------------------------------------------------------------
 
 # Cabeçalhos aceitos (comparação sem acentos/maiúsculas): coluna → campo interno
-# Observação: "unidade"/"gerencia" continuam reconhecidas por compatibilidade
-# com planilhas antigas, mas a partir da v2.0.0 o valor da coluna é IGNORADO —
-# a Unidade / Gerência é sempre fixada em DEFAULT_UNIT (ver loop de geração).
 _SPREADSHEET_COLUMNS = {
     "nome": "full_name",
     "nome completo": "full_name",
@@ -442,9 +595,8 @@ _SPREADSHEET_COLUMNS = {
     "celular whatsapp": "whatsapp",
     "segundo telefone": "whatsapp",
 }
-# "unit" não é mais obrigatório na planilha (é sempre substituído por
-# DEFAULT_UNIT); "whatsapp" sempre foi opcional.
-_REQUIRED_FIELDS = ("full_name", "role_title", "signature_email", "phone")
+# "whatsapp" é opcional; os demais, incluindo "unit", são obrigatórios na planilha.
+_REQUIRED_FIELDS = ("full_name", "role_title", "unit", "signature_email", "phone")
 _FIELD_LABELS = {
     "full_name": "Nome", "role_title": "Função", "unit": "Unidade",
     "signature_email": "E-mail", "phone": "Telefone", "whatsapp": "WhatsApp",
@@ -544,8 +696,8 @@ def _map_columns(header_row):
         raise ValueError(
             "Colunas obrigatórias não encontradas na planilha: "
             + ", ".join(_FIELD_LABELS[f] for f in missing)
-            + ". Use o cabeçalho: Nome; Função; E-mail; Telefone "
-            + "(Unidade é preenchida automaticamente; WhatsApp é opcional)."
+            + ". Use o cabeçalho: Nome; Função; Unidade; E-mail; Telefone "
+            + "(WhatsApp é opcional)."
         )
     return mapping
 
@@ -594,11 +746,145 @@ def batch_import_save_positions():
     return redirect(url_for("admin.batch_import"))
 
 
+def _cleanup_stale_import_jobs() -> None:
+    """Remove jobs de importação com mais de 24h (concluídos ou não) — só
+    guardam contadores e mensagens de erro, sem valor depois que a tela de
+    progresso já foi vista, então não há razão para acumular para sempre."""
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    ImportJob.query.filter(ImportJob.created_at < cutoff).delete(synchronize_session=False)
+    db.session.commit()
+
+
+def _run_batch_import_job(app, job_id, user_id, data_rows, mapping, output_format, with_icons, fields_config, background_path, template_id):
+    """Gera as assinaturas do lote em segundo plano (chamado numa thread à
+    parte, fora do ciclo de requisição HTTP) — atualiza o ImportJob no banco
+    a cada linha processada, para a barra de progresso (tela de importação)
+    poder consultar via polling em /admin/importar/progresso/<job_id>."""
+    with app.app_context():
+        job = ImportJob.query.get(job_id)
+        if not job:
+            return
+        try:
+            zip_buffer = io.BytesIO()
+            generated = 0
+            errors = []
+            used_names = set()
+            total = len(data_rows)
+
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                for i, (line_no, row) in enumerate(enumerate(data_rows, start=2), start=1):  # linha 1 = cabeçalho
+                    values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
+                              for idx, field in mapping.items()}
+                    values.setdefault("whatsapp", "")
+                    # O número de WhatsApp da planilha só é usado quando
+                    # "Incluir ícones" está marcado (aplica ao lote inteiro).
+                    if not with_icons:
+                        values["whatsapp"] = ""
+
+                    row_errors = [
+                        _FIELD_LABELS[f] for f in _REQUIRED_FIELDS if not (values.get(f) or "").strip()
+                    ]
+                    if row_errors:
+                        errors.append(f"Linha {line_no}: campo(s) vazio(s): {', '.join(row_errors)}.")
+                    elif not _EMAIL_RE.match(values["signature_email"]):
+                        errors.append(f"Linha {line_no}: e-mail inválido ({values['signature_email']}).")
+                    elif not _PHONE_RE.match(values["phone"]):
+                        errors.append(f"Linha {line_no}: telefone inválido ({values['phone']}).")
+                    elif values["whatsapp"].strip() and not _PHONE_RE.match(values["whatsapp"]):
+                        errors.append(f"Linha {line_no}: WhatsApp inválido ({values['whatsapp']}).")
+                    else:
+                        output_filename = generate_safe_filename(output_format)
+                        output_path = os.path.join(app.config["GENERATED_UPLOAD_DIR"], output_filename)
+                        try:
+                            render_signature(
+                                background_path=background_path,
+                                fields_config=fields_config,
+                                values=values,
+                                photo_path=None,
+                                output_path=output_path,
+                                output_format=output_format,
+                                max_width=app.config["OUTPUT_MAX_WIDTH"],
+                                jpeg_quality=app.config["JPEG_QUALITY"],
+                                variant="sem_foto",
+                                with_icons=with_icons,
+                            )
+                        except SignatureRenderError as exc:
+                            errors.append(f"Linha {line_no}: {exc}")
+                        else:
+                            record = SignatureRecord(
+                                user_id=user_id,
+                                template_id=template_id,
+                                full_name=values["full_name"][:120],
+                                role_title=values["role_title"][:120],
+                                unit=values["unit"][:120],
+                                signature_email=values["signature_email"][:190],
+                                phone=values["phone"][:40],
+                                whatsapp=(values["whatsapp"][:40] or None),
+                                with_icons=with_icons,
+                                source="batch",
+                                output_filename=output_filename,
+                                output_format=output_format,
+                                status="success",
+                            )
+                            db.session.add(record)
+
+                            arc = f"assinatura-{_slugify_filename(values['full_name'])}"
+                            n, base_arc = 2, arc
+                            while arc in used_names:
+                                arc = f"{base_arc}-{n}"
+                                n += 1
+                            used_names.add(arc)
+                            zf.write(output_path, f"{arc}.{output_format}")
+                            generated += 1
+
+                    # Grava o progresso a cada 5 linhas (e sempre na última) —
+                    # atualizar a cada linha geraria escritas demais no
+                    # SQLite; a cada 5 já dá uma barra fluida o suficiente.
+                    job.processed = i
+                    job.generated = generated
+                    job.set_errors(errors)
+                    if i % 5 == 0 or i == total:
+                        db.session.commit()
+
+            if generated == 0:
+                job.status = "error"
+                job.error_message = "Nenhuma assinatura foi gerada. Corrija os erros da planilha e tente novamente."
+                db.session.commit()
+                return
+
+            zip_name = f"{secrets.token_hex(16)}.zip"
+            zip_path = os.path.join(app.config["GENERATED_UPLOAD_DIR"], zip_name)
+            with open(zip_path, "wb") as fh:
+                fh.write(zip_buffer.getvalue())
+
+            job.status = "done"
+            job.zip_name = zip_name
+            job.generated = generated
+            job.processed = total
+            job.set_errors(errors)
+            db.session.commit()
+        except Exception as exc:  # noqa: BLE001 — job em segundo plano: qualquer falha precisa virar status "error", nunca travar em silêncio
+            db.session.rollback()
+            app.logger.exception("Falha no job de importação em lote %s", job_id)
+            job = ImportJob.query.get(job_id)
+            if job:
+                job.status = "error"
+                job.error_message = f"Falha inesperada ao gerar o lote: {exc}"
+                db.session.commit()
+
+
 @admin_bp.route("/importar", methods=["GET", "POST"])
 @supervisor_or_admin_required
 def batch_import():
     form = BatchImportForm()
     errors = []
+    # "fetch" = a página tem JavaScript e vai mostrar a barra de progresso via
+    # polling; sem esse cabeçalho (JS desabilitado ou formulário enviado do
+    # jeito clássico), o comportamento cai para o mesmo fluxo síncrono de
+    # sempre — a requisição só termina quando o lote inteiro estiver pronto.
+    wants_json = request.headers.get("X-Requested-With") == "fetch"
+
+    _cleanup_stale_import_jobs()
 
     # Modelo SEM FOTO ativo — usado tanto para a pré-visualização/reposicionamento
     # (GET) quanto para a geração em lote (POST). Sem ele, nem a prévia nem a
@@ -606,26 +892,31 @@ def batch_import():
     template = SignatureTemplate.query.filter_by(is_active=True, variant="sem_foto").first()
 
     def _render(**extra):
+        extra.setdefault("errors", errors)
+        extra.setdefault("zip_name", None)
+        extra.setdefault("generated", 0)
         return render_template(
-            "admin/batch_import.html", form=form, errors=errors, zip_name=None, generated=0,
-            template=template, unit_label=DEFAULT_UNIT, **extra
+            "admin/batch_import.html", form=form, template=template, **extra
         )
 
-    if not template:
-        flash("Nenhum modelo ativo da variante SEM FOTO. Ative um em Admin → Modelos antes de importar.", "error")
+    def _fail(message):
+        if wants_json:
+            return jsonify(error=message), 400
+        flash(message, "error")
         return _render()
+
+    if not template:
+        return _fail("Nenhum modelo ativo da variante SEM FOTO. Ative um em Admin → Modelos antes de importar.")
 
     if form.validate_on_submit():
         try:
             header, data_rows = _read_spreadsheet_rows(form.spreadsheet.data)
             mapping = _map_columns(header)
         except ValueError as exc:
-            flash(str(exc), "error")
-            return _render()
+            return _fail(str(exc))
 
         if len(data_rows) > 500:
-            flash("A planilha tem mais de 500 linhas. Divida em arquivos menores.", "error")
-            return _render()
+            return _fail("A planilha tem mais de 500 linhas. Divida em arquivos menores.")
 
         output_format = form.output_format.data if form.output_format.data in ("png", "jpg") else "png"
         with_icons = bool(form.with_icons.data)
@@ -643,115 +934,97 @@ def batch_import():
             try:
                 fields_config = validate_fields_json(form.fields_json.data, "sem_foto")
             except TemplateFieldsError as exc:
-                flash(str(exc), "error")
-                return _render()
+                return _fail(str(exc))
             _save_positions_if_changed(template, fields_config)
         else:
             fields_config = template.get_fields()
 
-        zip_buffer = io.BytesIO()
-        generated = 0
-        used_names = set()
-
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for line_no, row in enumerate(data_rows, start=2):  # linha 1 = cabeçalho
-                values = {field: sanitize_plain_text(str(row[idx] if idx < len(row) and row[idx] is not None else ""), 190)
-                          for idx, field in mapping.items()}
-                # Unidade / Gerência sempre fixa (v2.0.0) — o que estiver na
-                # planilha (se houver essa coluna) é descartado.
-                values["unit"] = DEFAULT_UNIT
-                values.setdefault("whatsapp", "")
-                # O número de WhatsApp da planilha só é usado quando "Incluir
-                # ícones" está marcado (aplica ao lote inteiro) — se
-                # desmarcado, o número é ignorado mesmo que exista na coluna.
-                if not with_icons:
-                    values["whatsapp"] = ""
-
-                row_errors = [
-                    _FIELD_LABELS[f] for f in _REQUIRED_FIELDS if not (values.get(f) or "").strip()
-                ]
-                if row_errors:
-                    errors.append(f"Linha {line_no}: campo(s) vazio(s): {', '.join(row_errors)}.")
-                    continue
-                if not _EMAIL_RE.match(values["signature_email"]):
-                    errors.append(f"Linha {line_no}: e-mail inválido ({values['signature_email']}).")
-                    continue
-                if not _PHONE_RE.match(values["phone"]):
-                    errors.append(f"Linha {line_no}: telefone inválido ({values['phone']}).")
-                    continue
-                if values["whatsapp"].strip() and not _PHONE_RE.match(values["whatsapp"]):
-                    errors.append(f"Linha {line_no}: WhatsApp inválido ({values['whatsapp']}).")
-                    continue
-
-                output_filename = generate_safe_filename(output_format)
-                output_path = os.path.join(current_app.config["GENERATED_UPLOAD_DIR"], output_filename)
-                try:
-                    render_signature(
-                        background_path=background_path,
-                        fields_config=fields_config,
-                        values=values,
-                        photo_path=None,
-                        output_path=output_path,
-                        output_format=output_format,
-                        max_width=current_app.config["OUTPUT_MAX_WIDTH"],
-                        jpeg_quality=current_app.config["JPEG_QUALITY"],
-                        variant="sem_foto",
-                        with_icons=with_icons,
-                    )
-                except SignatureRenderError as exc:
-                    errors.append(f"Linha {line_no}: {exc}")
-                    continue
-
-                record = SignatureRecord(
-                    user_id=current_user.id,
-                    template_id=template.id,
-                    full_name=values["full_name"][:120],
-                    role_title=values["role_title"][:120],
-                    unit=values["unit"][:120],
-                    signature_email=values["signature_email"][:190],
-                    phone=values["phone"][:40],
-                    whatsapp=(values["whatsapp"][:40] or None),
-                    with_icons=with_icons,
-                    output_filename=output_filename,
-                    output_format=output_format,
-                    status="success",
-                )
-                db.session.add(record)
-
-                arc = f"assinatura-{_slugify_filename(values['full_name'])}"
-                n, base_arc = 2, arc
-                while arc in used_names:
-                    arc = f"{base_arc}-{n}"
-                    n += 1
-                used_names.add(arc)
-                zf.write(output_path, f"{arc}.{output_format}")
-                generated += 1
-
+        job = ImportJob(id=secrets.token_hex(16), user_id=current_user.id, status="running", total=len(data_rows))
+        db.session.add(job)
         db.session.commit()
 
-        if generated == 0:
-            flash("Nenhuma assinatura foi gerada. Corrija os erros da planilha e tente novamente.", "error")
-            return _render()
+        app_obj = current_app._get_current_object()
+        thread = threading.Thread(
+            target=_run_batch_import_job,
+            args=(app_obj, job.id, current_user.id, data_rows, mapping, output_format, with_icons, fields_config, background_path, template.id),
+            daemon=True,
+        )
+        thread.start()
 
-        # Salva o ZIP em disco e mostra a página de resultado com o link de
-        # download + a lista de linhas ignoradas (se houver).
-        zip_name = f"{secrets.token_hex(16)}.zip"
-        zip_path = os.path.join(current_app.config["GENERATED_UPLOAD_DIR"], zip_name)
-        with open(zip_path, "wb") as fh:
-            fh.write(zip_buffer.getvalue())
+        if wants_json:
+            return jsonify(job_id=job.id, total=job.total)
 
-        if errors:
-            flash(f"{generated} assinatura(s) gerada(s); {len(errors)} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
+        # Sem JavaScript: espera o job terminar (do jeito de sempre, a
+        # requisição só volta quando o lote inteiro estiver pronto) e mostra
+        # o resultado direto — ninguém fica sem resposta por falta de JS.
+        thread.join()
+        db.session.refresh(job)
+        if job.status == "error":
+            flash(job.error_message or "Falha ao gerar o lote.", "error")
+            return _render(errors=job.get_errors())
+        if job.get_errors():
+            flash(f"{job.generated} assinatura(s) gerada(s); {len(job.get_errors())} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
         else:
-            flash(f"{generated} assinatura(s) gerada(s) com sucesso.", "success")
+            flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
         return render_template(
-            "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=errors,
-            zip_name=zip_name, generated=generated, template=template, unit_label=DEFAULT_UNIT,
+            "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
+            zip_name=job.zip_name, generated=job.generated, template=template,
         )
 
     if form.is_submitted():
+        if wants_json:
+            return jsonify(error="Formulário inválido. Confira os campos e tente novamente."), 400
         flash_form_errors(form)
     return _render()
+
+
+@admin_bp.route("/importar/progresso/<job_id>")
+@supervisor_or_admin_required
+def batch_import_progress(job_id):
+    """Consultado via JavaScript (polling) pela barra de progresso — só o
+    dono do job pode consultar (nada sensível além de contadores, mas não há
+    razão para um Supervisor ver o progresso do lote de outro)."""
+    job = ImportJob.query.get(job_id)
+    if not job or job.user_id != current_user.id:
+        abort(404)
+    return jsonify(
+        status=job.status,
+        total=job.total,
+        processed=job.processed,
+        generated=job.generated,
+        zip_name=job.zip_name,
+        errors=job.get_errors(),
+        error_message=job.error_message,
+    )
+
+
+@admin_bp.route("/importar/resultado/<job_id>")
+@supervisor_or_admin_required
+def batch_import_result(job_id):
+    """Página de resultado para quem importou via JavaScript (a barra de
+    progresso redireciona para cá assim que o job termina) — mesmo template
+    usado no fluxo síncrono (sem JS), só que lendo os dados do job salvo."""
+    job = ImportJob.query.get(job_id)
+    if not job or job.user_id != current_user.id:
+        abort(404)
+
+    template = SignatureTemplate.query.filter_by(is_active=True, variant="sem_foto").first()
+
+    if job.status == "running":
+        flash("A importação ainda está em andamento. Aguarde a barra de progresso terminar.", "info")
+        return redirect(url_for("admin.batch_import"))
+    if job.status == "error":
+        flash(job.error_message or "Falha ao gerar o lote.", "error")
+        return redirect(url_for("admin.batch_import"))
+
+    if job.get_errors():
+        flash(f"{job.generated} assinatura(s) gerada(s); {len(job.get_errors())} linha(s) com erro foram ignoradas (veja a lista abaixo).", "info")
+    else:
+        flash(f"{job.generated} assinatura(s) gerada(s) com sucesso.", "success")
+    return render_template(
+        "admin/batch_import.html", form=BatchImportForm(formdata=None), errors=job.get_errors(),
+        zip_name=job.zip_name, generated=job.generated, template=template,
+    )
 
 
 @admin_bp.route("/importar/download/<zip_name>")

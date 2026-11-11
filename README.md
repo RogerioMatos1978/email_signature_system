@@ -36,7 +36,7 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
    No mínimo, defina:
    - `SECRET_KEY` — gere uma chave única: `python3 -c "import secrets; print(secrets.token_hex(32))"`
-   - `ADMIN_SEED_USERNAME` e `ADMIN_SEED_PASSWORD` — conta de administrador criada automaticamente no primeiro start (já vem preenchido com `RogerioMatos` / `Admin@123` no `.env.example`; troque a senha se for usar em produção).
+   - `ADMIN_SEED_USERNAME` e `ADMIN_SEED_PASSWORD` — conta de administrador criada automaticamente no primeiro start (já vem preenchido com `EmAssinaturas` / `Admin@123` no `.env.example`; troque a senha se for usar em produção).
 
 2. Suba o container:
 
@@ -46,7 +46,7 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 3. Acesse:
    - No próprio servidor: **http://localhost:5002**
-   - De qualquer outro computador na rede local: **http://192.169.60.69:5002** (ajuste para o IP atual do servidor, se mudar — veja como descobrir abaixo)
+   - De qualquer outro computador na rede local: **http://IP:5002** (ajuste para o IP atual do servidor, se mudar — veja como descobrir abaixo)
 
    > O sistema roda na porta **5002** (não usa a porta 5000), tanto internamente quanto no mapeamento do `docker-compose.yml`. O Gunicorn já escuta em `0.0.0.0`, então qualquer máquina na mesma rede local consegue acessar pelo IP do servidor, sem configuração adicional — só verifique se o firewall do Windows libera a porta 5002 para conexões de entrada.
 
@@ -60,6 +60,112 @@ Sistema web para geração de assinaturas de e-mail em **PNG/JPG** prontas para 
 
 Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `signature_instance`, persistente entre reinicializações e atualizações do container.
 
+> **Quer colocar o sistema online, acessível pela internet (não só na rede
+> local)?** Veja o [`GUIA_DEPLOY.md`](GUIA_DEPLOY.md) — passo a passo com VPS,
+> domínio, HTTPS automático (Caddy) e backup. **Leia a seção 0 do guia antes
+> de tudo:** um `.env` com segredos reais chegou a ser versionado no Git neste
+> projeto; a `SECRET_KEY` e a senha de admin daquele período devem ser
+> tratadas como comprometidas e trocadas.
+
+> **Atualizando de uma instalação anterior à v2.8.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidades: ícone de
+> WhatsApp no Telefone quando marcado como tal, validação de CPF por dígito
+> verificador, máscara de CPF no cadastro de usuário, informativo
+> Usuário/CPF na tela de login, e a troca de senha deixou de ser obrigatória
+> (agora é opcional, em "Minha conta").
+>
+> **Atualizando de uma instalação anterior à v2.7.2?** Muda o banco (coluna
+> `qrcode_filename` removida de `signature_records`) — é preciso resetar o
+> volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> O QR Code do WhatsApp em "Gerar assinatura" foi removido por completo, e
+> marcar "Este telefone também é o WhatsApp" deixou de deslocar o texto do
+> Telefone na imagem — ele agora fica sempre na mesma posição.
+>
+> **Atualizando de uma instalação anterior à v2.7.1?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Correções em "Gerar
+> assinatura": QR Code do WhatsApp aumentado para 36px com posicionamento
+> vertical corrigido, e fim da duplicação do número quando "Este telefone
+> também é o WhatsApp" está marcado. O campo separado "WhatsApp (opcional)" e
+> o ícone automático de WhatsApp foram removidos dessa tela (a importação de
+> planilha não foi afetada).
+>
+> **Atualizando de uma instalação anterior à v2.7.0?** Muda o banco (nova
+> coluna `qrcode_filename` em `signature_records`) — é preciso resetar o
+> volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidades (só em "Gerar assinatura", não na importação de planilha): upload
+> opcional de QR Code do WhatsApp (32x32px, inserido antes do número) e opção
+> "Este telefone também é o WhatsApp" no campo Telefone.
+>
+> **Atualizando de uma instalação anterior à v2.6.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidade: login por CPF para
+> Usuário padrão — nova tela **Admin → Usuários → Importar CPFs** cria contas em
+> lote a partir de uma planilha (Nome; CPF), com login e senha inicial iguais
+> ao CPF; "Novo usuário" também aceita CPF quando o perfil é "Usuário padrão"
+> (Supervisor/Administrador continuam com usuário livre e senha temporária, sem
+> mudança). A busca pública em "Como inserir sua assinatura no Outlook" passa a
+> aceitar CPF além do nome.
+>
+> **Atualizando de uma instalação anterior à v2.5.1?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Ajuste de layout: os cards
+> do painel se distribuem melhor no espaço disponível em telas largas (não
+> ficam mais presos a uma faixa central estreita com espaço vazio nas
+> laterais), e o padding geral das páginas ficou um pouco mais enxuto.
+>
+> **Atualizando de uma instalação anterior à v2.5.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). O campo "Unidade / Gerência"
+> volta a ser texto livre (geração individual e importação em lote) — a lista
+> fixa de opções da v2.0.0 foi removida. Na planilha de importação, a coluna
+> "Unidade"/"Gerência" volta a ser obrigatória.
+>
+> **Atualizando de uma instalação anterior à v2.4.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Este é um reforço de
+> segurança para quem for expor o sistema na internet (não muda nada no uso
+> em rede local): `.env` deixou de ser versionado no Git (era um risco de
+> vazamento de credenciais), suporte opcional a proxy reverso confiável
+> (`TRUST_PROXY_HEADERS`, para IP/HTTPS reais chegarem corretos atrás do
+> Caddy/nginx), cabeçalho HSTS quando o acesso é HTTPS, e novos arquivos de
+> apoio para deploy em produção (`docker-compose.prod.yml`, `Caddyfile.example`,
+> `scripts/backup.sh`, `GUIA_DEPLOY.md`).
+>
+> **Atualizando de uma instalação anterior à v2.3.0?** Sem mudança de banco —
+> basta `docker compose up -d --build` (sem `-v`). Novidades: favicon novo com
+> as cores da marca, e ícones de e-mail/telefone/WhatsApp redesenhados (no
+> menu e dentro da própria imagem da assinatura, quando "Incluir ícones" está
+> marcado) — o ícone de telefone agora é uma silhueta de aparelho, bem mais
+> reconhecível.
+>
+> **Atualizando de uma instalação anterior à v2.2.0?** Muda o banco (novas
+> colunas `source` e `public_download_count` em `signature_records`) — é
+> preciso resetar o volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidade: assinaturas geradas por importação de planilha deixam de ter a
+> trava de "peça ao Supervisor/Administrador" no portal público — agora podem
+> ser baixadas até 4 vezes, e o registro é apagado automaticamente ao atingir
+> o limite (basta reimportar quando precisar de novo). Assinaturas geradas
+> individualmente continuam com a trava de download único de sempre.
+>
+> **Atualizando de uma instalação anterior à v2.1.0?** Muda o banco (nova
+> tabela `import_jobs`) — é preciso resetar o volume uma vez:
+> ```bash
+> docker compose down -v
+> docker compose up -d --build
+> ```
+> Novidades: barra de progresso ao importar planilha em lote (a geração roda em
+> segundo plano e a tela mostra "Gerando X de Y assinatura(s)..." em tempo
+> real); terceiro tema do site "Cor da assinatura" (paleta azul FIEG), além de
+> Branco e Preto — o botão de tema virou um seletor de 3 opções.
+>
 > **Atualizando de uma instalação anterior à v2.0.1?** Sem mudança de banco —
 > basta `docker compose up -d --build` (sem `-v`). Correções: número de WhatsApp
 > da planilha agora é reconhecido mesmo com cabeçalhos fora do padrão exato (ex.:
@@ -162,7 +268,7 @@ Os dados (banco SQLite + imagens enviadas/geradas) ficam no volume nomeado `sign
 
 ## Primeiro acesso
 
-1. Faça login com o usuário/senha definidos em `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` (por padrão: `RogerioMatos` / `Admin@123`).
+1. Faça login com o usuário/senha definidos em `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` (por padrão: `EmAssinaturas` / `Admin@123`).
 2. O sistema exigirá a troca de senha no primeiro login (por segurança).
 3. Como administrador, acesse **Modelos** e cadastre a imagem de fundo padrão da assinatura, posicionando os campos (nome, função, unidade, e-mail, telefone e foto) com o editor de arrastar e soltar. Os dois modelos oficiais FIEG 2026 (sem foto / com foto) já vêm prontos e ativados automaticamente.
 4. Cadastre os usuários padrão e supervisores em **Usuários** — uma senha temporária é exibida uma única vez na tela; repasse-a com segurança à pessoa (o sistema não envia e-mails).

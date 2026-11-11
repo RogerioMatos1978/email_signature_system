@@ -2,6 +2,129 @@
 
 Este projeto segue [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [2.8.0] — 2026-08-13
+
+### Adicionado
+
+- **Ícone de WhatsApp condicional no Telefone**: em "Gerar assinatura", com "Incluir ícones" marcado, o campo Telefone passa a mostrar o ícone de WhatsApp em vez do ícone padrão de telefone quando "Este telefone também é o WhatsApp" está marcado — desmarcado, continua com o ícone padrão de telefone. O texto/posição do campo não mudam em nenhum dos dois casos.
+- **Validação de CPF por dígito verificador**: o cadastro de "Usuário padrão" (Novo usuário e Importar CPFs) agora valida o CPF pelo algoritmo oficial (módulo 11), rejeitando CPFs com 11 dígitos mas números errados (ex.: digitação trocada) e sequências óbvias como "000.000.000-00".
+- **Máscara de CPF no cadastro de usuário**: em Admin → Usuários → Novo usuário, ao selecionar o perfil "Usuário padrão", o campo Usuário formata automaticamente como CPF (000.000.000-00) enquanto o administrador digita — continua aceitando só números como entrada.
+- **Informativo Usuário/CPF na tela de login**: a tela de login agora indica que contas de Usuário padrão usam o CPF (somente números) como usuário, e Supervisor/Administrador usam o usuário cadastrado normalmente.
+
+### Alterado
+
+- **Troca de senha deixou de ser obrigatória**: contas recém-criadas ou com senha redefinida pelo administrador (temporária ou CPF) não são mais forçadas a trocar a senha no primeiro acesso — podem continuar usando o sistema normalmente e trocar quando quiserem em "Minha conta". As mensagens de criação/importação de usuário e a tela "Minha conta" foram atualizadas para deixar isso claro.
+
+Sem mudança de banco de dados.
+
+## [2.7.2] — 2026-08-13
+
+### Removido
+
+- **QR Code do WhatsApp removido de "Gerar assinatura"**: o upload de imagem de QR Code (introduzido na v2.7.0, ajustado na v2.7.1) foi retirado por completo — não aparece mais campo de upload, nada é composto na imagem final, e a coluna `qrcode_filename` foi removida do banco de dados.
+
+### Corrigido
+
+- **Deslocamento do texto do Telefone ao marcar "Este telefone também é o WhatsApp"**: a correção de duplicação da v2.7.1 apagava o texto de "Telefone" e reaproveitava a posição de "WhatsApp" no modelo, o que fazia o número "pular" de lugar na imagem ao marcar/desmarcar a opção. Agora o campo Telefone é sempre desenhado na sua posição normal, sem exceção — marcar "Este telefone também é o WhatsApp" só grava essa informação no registro (para fins de auditoria/busca), sem alterar em nada a imagem gerada nem a pré-visualização.
+
+### Alterado (mudança de banco)
+
+- Coluna `qrcode_filename` removida de `signature_records`. Requer reset do volume em instalações que já rodaram a v2.7.0/2.7.1:
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
+
+## [2.7.1] — 2026-08-13
+
+### Corrigido
+
+- **QR Code do WhatsApp**: aumentado de 32px para **36px** e corrigida a centralização vertical (a fórmula antiga, pensada para os ícones pequenos escalados a partir da fonte, deslocava o QR para baixo demais em relação ao texto — agora ele fica alinhado ao centro visual da linha, como um "vertical-align: middle").
+- **Duplicação do número ao marcar "Este telefone também é o WhatsApp"**: a assinatura mostrava o mesmo número duas vezes (uma vez como "Telefone", outra como "WhatsApp"). Agora, quando o telefone está marcado como WhatsApp, o número aparece só uma vez, na linha de WhatsApp — a linha de Telefone não é mais desenhada nesse caso (o registro de auditoria continua com o telefone completo, só a imagem gerada é que deixou de duplicar).
+
+### Alterado
+
+- **Campo "WhatsApp (opcional)" removido de "Gerar assinatura"**: a única forma de ter um número de WhatsApp na assinatura agora é marcar "Este telefone também é o WhatsApp" — sem digitar de novo em outro campo. Sem alteração na importação de planilha, que continua com sua própria coluna de WhatsApp.
+- **Ícone automático de WhatsApp removido de "Gerar assinatura"**: com o QR Code assumindo esse papel, o ícone desenhado automaticamente pelo sistema para o campo WhatsApp deixou de aparecer nessa tela (mesmo com "Incluir ícones" marcado) — e-mail e telefone continuam com ícone normalmente. A importação de planilha não foi afetada: o ícone de WhatsApp automático continua funcionando lá exatamente como antes.
+
+Sem mudança de banco de dados.
+
+## [2.7.0] — 2026-08-13
+
+### Adicionado
+
+- **QR Code do WhatsApp em "Gerar assinatura"** (só na geração individual — não disponível na importação de planilha): novo upload opcional de imagem de QR Code, inserida em **32x32px** imediatamente antes do número de WhatsApp na assinatura, no lugar do ícone de WhatsApp desenhado pelo sistema (quando "Incluir ícones" também está marcado).
+- **Campo Telefone ganhou a opção "Este telefone também é o WhatsApp"** (só em "Gerar assinatura"): ao marcar, o número já digitado em Telefone passa a ser usado também como WhatsApp na assinatura, sem precisar redigitar no campo separado "WhatsApp (opcional)" — que continua existindo para quem tiver um número diferente.
+
+### Alterado (mudança de banco)
+
+- `signature_records` ganhou a coluna `qrcode_filename` (sempre vazia para assinaturas geradas por importação de planilha). Requer reset do volume em instalações existentes:
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
+
+## [2.6.0] — 2026-08-13
+
+### Adicionado
+
+- **Login por CPF para Usuário padrão.** Nova tela **Admin → Usuários → Importar CPFs** (só Administrador): sobe uma planilha (Nome; CPF) e cria uma conta de Usuário padrão para cada linha — login e senha inicial de cada conta são o próprio CPF (somente números; aceita CPF digitado com ou sem pontuação na planilha, mas grava só os dígitos). CPFs duplicados (na própria planilha ou já cadastrados no sistema) são rejeitados e listados no resultado, sem interromper as demais linhas.
+- **Admin → Usuários → Novo usuário** também passa a aceitar CPF quando o perfil escolhido é "Usuário padrão": o campo "Usuário" exige um CPF de 11 dígitos e a senha inicial da conta passa a ser o próprio CPF — a tela deixa de mostrar a senha temporária aleatória ("chave de acesso") nesse caso, já que a senha já é conhecida (o CPF). Para os perfis Supervisor e Administrador, nada muda: continuam com usuário livre e senha temporária aleatória gerada pelo sistema, como sempre foi.
+- **Busca pública por CPF**: na página "Como inserir sua assinatura no Outlook" (`/ajuda/outlook`), o campo de busca (sem login) passa a aceitar também o CPF do colaborador (somente números), além do nome — encontra a assinatura gerada pela própria conta CPF do usuário. Continua funcionando exatamente como antes para busca por nome.
+
+Sem mudança de banco de dados (usa as colunas já existentes de `users`).
+
+## [2.5.1] — 2026-08-13
+
+### Corrigido
+
+- **Layout do painel: cards distribuídos de forma mais equilibrada na tela**, em vez de ficarem presos a uma faixa central estreita (max-width 1100px) com uma sobra enorme de espaço vazio nas laterais em monitores largos, e cards "órfãos" (ex.: 5 cartões de estatística viravam 4 numa linha + 1 sozinho embaixo). Os grids de cards agora se ajustam automaticamente à largura disponível (CSS `auto-fit`/`minmax`, sem precisar de várias media queries por breakpoint), o container passou a usar até 1400px de largura (antes 1100px), e o padding interno das páginas e dos cards foi reduzido um pouco.
+
+## [2.5.0] — 2026-08-13
+
+### Alterado
+
+- **Unidade / Gerência volta a ser um campo de texto livre**, na geração individual e na importação em lote — deixou de ser a lista fixa de opções (só "UI Rio Verde - Sesi Senai") introduzida na v2.0.0. Na importação por planilha, a coluna "Unidade"/"Gerência" volta a ser obrigatória e o valor de cada linha é usado normalmente (deixou de ser ignorado/sobrescrito).
+
+## [2.4.0] — 2026-08-12
+
+### Segurança
+
+- **Crítico**: o arquivo `.env` (com `SECRET_KEY` e senha do administrador reais) estava versionado no Git e havia sido enviado ao repositório remoto. Adicionado `.gitignore` (não existia antes) e removido `.env`, `__pycache__/`, `.idea/` e afins do controle de versão. **Ação obrigatória para quem for expor o sistema na internet:** gerar uma `SECRET_KEY` nova e trocar a senha de admin — ver seção 0 do `GUIA_DEPLOY.md`.
+- Suporte opcional a proxy reverso confiável: `TRUST_PROXY_HEADERS` (padrão `false`) ativa `ProxyFix` (Werkzeug), fazendo o Flask enxergar o IP e o `https` reais do visitante quando o sistema roda atrás de um proxy como Caddy/nginx — necessário para o rate limiting por IP e a auditoria funcionarem corretamente em produção. Só deve ser ativado quando existir de fato um proxy confiável na frente (senão qualquer visitante poderia forjar os cabeçalhos).
+- Cabeçalho `Strict-Transport-Security` (HSTS) passa a ser enviado automaticamente quando a requisição chega via HTTPS.
+
+### Adicionado
+
+- `GUIA_DEPLOY.md`: guia passo a passo para colocar o sistema online (VPS, domínio, DNS, Docker, HTTPS automático via Caddy, backup, checklist de segurança).
+- `docker-compose.prod.yml`: variante do Compose para produção — o serviço `web` não fica exposto diretamente à internet (só o Caddy, nas portas 80/443).
+- `Caddyfile.example` e `scripts/backup.sh` (backup do volume de dados, pronto para agendar via cron).
+- `.env.example`: novas variáveis documentadas (`TRUST_PROXY_HEADERS`, `GUNICORN_WORKERS`).
+
+## [2.3.0] — 2026-08-11
+
+### Adicionado
+- **Favicon novo**, gerado com as cores oficiais da marca (degradê azul-marinho `#0B4390` → azul FIEG `#008BD2`, envelope branco) — aparece na aba do navegador, nos favoritos e como ícone de atalho em celulares (`apple-touch-icon`). Gerado localmente com Pillow, sem depender de nenhum serviço externo.
+
+### Alterado
+- **Ícones de e-mail, telefone e WhatsApp redesenhados**, na mesma linguagem visual do novo favicon — tanto os ícones do menu/interface (app/templates/_icons.html) quanto os desenhados dentro da própria imagem da assinatura quando "Incluir ícones" está marcado (app/utils/image_utils.py). Destaque: o ícone de telefone deixou de ser uma linha diagonal abstrata e virou uma silhueta de aparelho (retângulo arredondado com alto-falante e botão), bem mais reconhecível.
+
+## [2.2.0] — 2026-08-10
+
+### Alterado (mudança de banco e de comportamento)
+- **Portal público: assinaturas geradas por importação de planilha não têm mais a trava de "peça ao Supervisor/Administrador" após 1 download.** Como esses colaboradores tipicamente não têm conta de usuário cadastrada no sistema, a trava de download único (pensada para o autoatendimento do usuário padrão) não fazia sentido para eles. Agora: uma assinatura gerada em lote pode ser baixada pelo portal público **até 4 vezes**; ao atingir o limite, o registro é **apagado automaticamente** — não é mais preciso pedir para ninguém reenviar, basta reimportar a planilha (ou gerar de novo individualmente) quando precisar. Assinaturas geradas individualmente (autoatendimento do usuário padrão, ou Admin/Supervisor gerando para alguém específico) continuam com a trava de download único de sempre.
+- A busca pública agora mostra "Restam N download(s)" ao lado do botão de baixar, para as assinaturas de lote.
+- `signature_records` ganhou as colunas `source` ("individual"/"batch") e `public_download_count`. Requer reset do volume em instalações existentes: `docker compose down -v && docker compose up -d --build`.
+
+## [2.1.0] — 2026-08-10
+
+### Adicionado
+- **Barra de progresso na importação em lote**: ao clicar em "Importar e gerar assinaturas", a geração roda em segundo plano no servidor e a tela mostra uma barra de progresso em tempo real ("Gerando X de Y assinatura(s)..."), em vez de ficar sem nenhum retorno visual até o lote inteiro terminar. Sem JavaScript, o comportamento cai automaticamente para o mesmo fluxo de sempre (espera o lote todo e mostra o resultado direto).
+- **Terceiro tema do site: "Cor da assinatura"**, além de Branco e Preto — usa a mesma paleta azul da assinatura oficial FIEG (#008BD2) como cor de destaque, com a barra lateral em um degradê azul-marinho → azul, no mesmo espírito visual da própria assinatura gerada. O botão único de alternância virou um seletor de 3 opções (ícones sol / lua / gota).
+
+### Alterado (mudança de banco)
+- Nova tabela `import_jobs`, usada para acompanhar o progresso de cada importação em lote. Requer reset do volume em instalações existentes: `docker compose down -v && docker compose up -d --build`.
+
 ## [2.0.1] — 2026-08-07
 
 ### Corrigido
@@ -156,7 +279,7 @@ A fonte Neo Sans foi extraída do arquivo PowerPoint oficial da própria organiz
 
 ### Alterado (breaking change)
 - Login trocado de e-mail para **usuário** em todo o sistema (`User.email` → `User.username`). Requer reset do banco em instalações existentes — veja o aviso no README.
-- Administrador inicial provisionado por padrão como `RogerioMatos` / `Admin@123` (via `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` no `.env`); a senha é trocada obrigatoriamente no primeiro login.
+- Administrador inicial provisionado por padrão como `EmAssinaturas` / `Admin@123` (via `ADMIN_SEED_USERNAME`/`ADMIN_SEED_PASSWORD` no `.env`); a senha é trocada obrigatoriamente no primeiro login.
 
 ## [1.0.2] — 2026-07-28
 
@@ -199,17 +322,17 @@ with app.app_context():
         print('Usuarios no banco:')
         for u in users:
             print(f' - {u.username} | papel={u.role} | ativo={u.is_active_flag} | trocar_senha={u.must_change_password}')
-        admin = User.query.filter_by(username='rogeriomatos').first()
+        admin = User.query.filter_by(username='EmAssinaturas').first()
         if admin:
             admin.set_password('Admin@123')
             admin.must_change_password = True
             admin.current_session_token = None
             db.session.commit()
             print()
-            print('>>> Senha do rogeriomatos RESETADA para: Admin@123')
+            print('>>> Senha do EmAssinaturas RESETADA para: Admin@123')
         else:
             print()
-            print('>>> Usuario rogeriomatos NAO existe no banco.')
+            print('>>> Usuario EmAssinaturas NAO existe no banco.')
     except Exception as e:
         print('ERRO DE BANCO:', e)
 "
